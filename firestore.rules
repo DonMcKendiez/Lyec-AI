@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedAdmin() {
+      return request.auth.token.email == "donmckenz20@gmail.com" && isEmailVerified();
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Showcase Items
+    match /showcase/{itemId} {
+      function isValidShowcaseItem(data) {
+        return data.keys().hasAll(['title', 'description', 'category', 'image']) &&
+               data.keys().size() >= 4 &&
+               data.title is string && data.title.size() <= 200 &&
+               data.description is string && data.description.size() <= 1000 &&
+               data.category in ['food', 'wares', 'activities'] &&
+               data.image is string && data.image.size() <= 2000;
+      }
+
+      allow list: if true;
+      allow get: if true;
+      
+      allow create: if isAdmin() && isValidShowcaseItem(request.resource.data) && (
+        !('createdAt' in request.resource.data) || request.resource.data.createdAt == request.time
+      );
+
+      allow update: if isAdmin() && isValidShowcaseItem(request.resource.data) && (
+        // Action: Edit
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'description', 'category', 'image', 'updatedAt']) &&
+        (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt == request.time)
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // Admin List
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // User Profiles
+    match /profiles/{userId} {
+      function isValidProfile(data) {
+        return data.uid == userId;
+      }
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin()) && isValidProfile(request.resource.data);
+    }
+
+    // Scans History
+    match /scans/{scanId} {
+      allow read: if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // Default deny (moved to bottom)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

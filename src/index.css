@@ -1,0 +1,60 @@
+@import url('https://fonts.googleapis.com/css2?family=Bellota:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Bellota+Text:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.cdnfonts.com/css/begonia');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Bellota Text", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-display: "Begonia", "Bellota", serif;
+
+  --color-brand-primary: #f27d26;
+  --color-brand-primary-hover: #d96a1a;
+  --color-brand-accent: #ffd700;
+  --color-brand-bg: #f9f8f4;
+  --color-brand-text: #1a1a1a;
+  --color-brand-border: #e8e6e1;
+}
+
+body {
+  @apply bg-brand-bg text-brand-text font-sans antialiased selection:bg-brand-primary/20 selection:text-brand-primary;
+}
+
+h1, h2, h3, h4 {
+  @apply font-black tracking-tight;
+}
+
+@utility no-scrollbar {
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@utility custom-scrollbar {
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: #e5e7eb;
+    border-radius: 10px;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background: #d1d5db;
+  }
+}
+
+.markdown-body {
+  @apply text-brand-text;
+}
+
+.interactive-card {
+  @apply bg-white border border-brand-border rounded-[2.5rem] shadow-[0_4px_24px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_12px_32px_-4px_rgba(0,0,0,0.1)] transition-all duration-500 overflow-hidden;
+}
+
+.nav-button-glow {
+  @apply absolute -bottom-1 w-1 h-1 bg-white rounded-full transition-all duration-300;
+}

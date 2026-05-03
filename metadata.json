@@ -1,0 +1,6 @@
+{
+  "name": "Lyec AI",
+  "description": "Interactive Acholi language learning, translation, and cultural guide.",
+  "requestFramePermissions": ["microphone", "camera"],
+  "majorCapabilities": []
+}

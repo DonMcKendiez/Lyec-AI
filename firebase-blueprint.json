@@ -1,0 +1,57 @@
+{
+  "entities": {
+    "ShowcaseItem": {
+      "title": "Showcase Item",
+      "description": "A cultural artifact, food, or activity displayed in the heritage feed.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string", "enum": ["food", "wares", "activities", "history", "stories", "dances"] },
+        "image": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "description", "category", "image"]
+    },
+    "Admin": {
+      "title": "Admin User",
+      "description": "A user with administrative privileges.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" }
+      },
+      "required": ["email"]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stored preferences and learning progress for each user.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "level": { "type": "integer", "default": 1 },
+        "xp": { "type": "integer", "default": 0 },
+        "ageMode": { "type": "string", "enum": ["adult", "child"], "default": "adult" },
+        "persona": { "type": "string", "enum": ["professional", "friendly", "bestie", "colleague"], "default": "friendly" },
+        "faceVerified": { "type": "boolean", "default": false },
+        "learningLog": { "type": "array" }
+      },
+      "required": ["uid"]
+    }
+  },
+  "firestore": {
+    "/showcase/{itemId}": {
+      "schema": "ShowcaseItem",
+      "description": "Public collection of cultural showcase items."
+    },
+    "/admins/{adminId}": {
+      "schema": "Admin",
+      "description": "Internal collection of admin users."
+    },
+    "/profiles/{userId}": {
+      "schema": "UserProfile",
+      "description": "Individual user profiles and settings."
+    }
+  }
+}
