@@ -26,6 +26,7 @@ import { NotificationProvider, useNotification } from './contexts/NotificationCo
 import { db } from './lib/firebase';
 import { doc, getDocFromServer } from 'firebase/firestore';
 import { Phone, Sparkles as SparklesIcon } from 'lucide-react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 type Tab = 'home' | 'translator' | 'chat' | 'practice' | 'culture' | 'lab' | 'dictionary' | 'scan' | 'privacy' | 'terms' | 'admin' | 'auth' | 'progress';
 
@@ -277,6 +278,7 @@ export default function App() {
     <NotificationProvider>
       <AuthProvider>
         <AppContent />
+        <SpeedInsights />
       </AuthProvider>
     </NotificationProvider>
   );
