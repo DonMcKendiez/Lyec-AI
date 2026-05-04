@@ -32,7 +32,7 @@ import { db } from './lib/firebase';
 import { doc, getDocFromServer } from 'firebase/firestore';
 import { Phone, Sparkles as SparklesIcon } from 'lucide-react';
 
-import { requestNotificationPermission, sendLocalNotification, checkForUpdates, APP_VERSION } from './services/notificationService';
+import { requestNotificationPermission, sendLocalNotification, checkForUpdates, APP_VERSION, acknowledgeUpdate } from './services/notificationService';
 
 type Tab = 'home' | 'scan' | 'chat' | 'dictionary' | 'translator' | 'culture' | 'lab' | 'progress' | 'practice' | 'auth' | 'admin' | 'settings' | 'privacy' | 'terms' | 'vault-prefs' | 'identity-security' | '404';
 
@@ -42,10 +42,38 @@ function AppContent() {
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<{ available: boolean; version: string } | null>(null);
+  
+  const [showBars, setShowBars] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
+  const mainScrollRef = useRef<HTMLElement>(null);
+  
   const { user, profile, isAdmin, loading, signOut } = useAuth();
   const { notify } = useNotification();
 
   const lastRemindedMinute = useRef<string>('');
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const container = mainScrollRef.current;
+      if (!container) return;
+      
+      const currentScrollY = container.scrollTop;
+      const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
+
+      if (currentScrollY > lastScrollY && currentScrollY > 60 && !isAtBottom) {
+        setShowBars(false);
+      } else {
+        setShowBars(true);
+      }
+      setLastScrollY(currentScrollY);
+    };
+
+    const container = mainScrollRef.current;
+    if (container) {
+      container.addEventListener('scroll', handleScroll, { passive: true });
+    }
+    return () => container?.removeEventListener('scroll', handleScroll);
+  }, [lastScrollY]);
 
   useEffect(() => {
     // Validate Connection to Firestore
@@ -87,11 +115,10 @@ function AppContent() {
           notify("Learning Alert", "Your scheduled heritage session is now active.", "info", true);
         }
       }
-    }, 10000); // Check every 10 seconds for precision
+    }, 10000);
 
-    // Mock background activity (New Posts)
+    // Mock background activity
     const postInterval = setInterval(() => {
-      // 5% chance of a "new post" every minute
       if (Math.random() < 0.05) {
         notify("Archive Update", "New cultural artifacts have been cataloged in the heritage feed.", "success", true);
       }
@@ -102,9 +129,6 @@ function AppContent() {
     const handleOffline = () => setIsOnline(false);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
-    // Initial check
-    setIsOnline(navigator.onLine);
 
     return () => {
       clearInterval(reminderInterval);
@@ -171,12 +195,16 @@ function AppContent() {
   return (
     <div className="min-h-screen flex flex-col bg-brand-bg selection:bg-brand-primary selection:text-white overflow-hidden">
       {/* App Shell Header */}
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-stone-100 px-4 h-16 flex items-center justify-between">
+      <motion.header 
+        animate={{ y: showBars ? 0 : -100 }}
+        transition={{ type: "spring", damping: 25, stiffness: 200 }}
+        className="fixed top-0 inset-x-0 z-40 bg-white/80 backdrop-blur-xl border-b border-stone-100 px-4 h-16 flex items-center justify-between"
+      >
         <div className="flex items-center gap-3">
           <button onClick={() => setActiveTab('home')} className="flex items-center gap-2">
             <Logo size={32} />
-            <div className="flex flex-col -space-y-1">
-              <span className="text-sm font-black text-brand-text tracking-tighter uppercase italic italic">Lyec<span className="text-brand-primary">AI</span></span>
+            <div className="flex flex-col -space-y-1 text-left">
+              <span className="text-sm font-black text-brand-text tracking-tighter uppercase italic">Lyec<span className="text-brand-primary">AI</span></span>
               <span className="text-[7px] font-black uppercase tracking-[0.2em] text-stone-400">Acholi Heritage</span>
             </div>
           </button>
@@ -188,7 +216,7 @@ function AppContent() {
               onClick={() => setActiveTab('settings')}
               className="group flex items-center gap-2 p-1 pr-3 bg-stone-50 border border-stone-100 rounded-2xl active:scale-95 transition-all shadow-sm hover:border-brand-primary/30"
             >
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-white border border-stone-100 flex items-center justify-center overflow-hidden transition-all group-hover:shadow-md">
+              <div className="w-8 h-8 rounded-xl bg-white border border-stone-100 flex items-center justify-center overflow-hidden transition-all group-hover:shadow-md">
                 {user.photoURL ? (
                   <img src={user.photoURL} alt="" className="w-full h-full object-cover" />
                 ) : (
@@ -207,14 +235,17 @@ function AppContent() {
               onClick={() => setActiveTab('auth')}
               className="px-4 py-2 bg-brand-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg hover:shadow-brand-primary/20 active:scale-95 transition-all"
             >
-              Sign In / Register
+              Sign In
             </button>
           )}
         </div>
-      </header>
+      </motion.header>
 
       {/* Viewport Content */}
-      <main className="flex-1 relative overflow-y-auto no-scrollbar pb-32">
+      <main 
+        ref={mainScrollRef as any}
+        className="flex-1 relative overflow-y-auto no-scrollbar pt-16 pb-32"
+      >
         <AnimatePresence>
           {updateInfo?.available && (
             <motion.div 
@@ -234,7 +265,8 @@ function AppContent() {
               </div>
               <button 
                 onClick={() => {
-                  window.location.reload(); // Simulate an update by reloading
+                  acknowledgeUpdate(updateInfo.version);
+                  window.location.reload(); 
                   setUpdateInfo(null);
                 }}
                 className="px-4 py-1.5 bg-white text-brand-primary rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-stone-50 active:scale-95 transition-all shadow-sm"
@@ -259,8 +291,28 @@ function AppContent() {
         </AnimatePresence>
       </main>
 
-      {/* Apple-esque Mobile Bottom Navigation */}
-      <nav className="fixed bottom-0 inset-x-0 z-50 bg-white/80 backdrop-blur-3xl border-t border-stone-100 flex items-end justify-around px-2 pb-safe-bottom h-[72px] md:h-24">
+      {/* Apple-esque Mobile Bottom Navigation with Drawer Handle */}
+      <motion.nav 
+        drag="y"
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={0.1}
+        onDragEnd={(_, info) => {
+          if (info.offset.y < -50) setShowBars(true);
+        }}
+        animate={{ y: showBars ? 0 : 120 }}
+        transition={{ type: "spring", damping: 30, stiffness: 300 }}
+        className="fixed bottom-0 inset-x-0 z-50 bg-white/80 backdrop-blur-3xl border-t border-stone-100 flex items-end justify-around px-2 pb-safe-bottom h-[72px] md:h-24"
+      >
+        {/* Drawer Handle (Visible when hidden) */}
+        {!showBars && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="absolute -top-12 left-1/2 -translate-x-1/2 w-16 h-10 flex items-center justify-center cursor-grab active:cursor-grabbing"
+          >
+            <div className="w-10 h-1.5 bg-brand-primary/40 rounded-full animate-bounce shadow-sm" />
+          </motion.div>
+        )}
         {mainTabs.map((tab) => (
           <button
             key={tab.id}
@@ -313,7 +365,7 @@ function AppContent() {
             )}
           </button>
         ))}
-      </nav>
+      </motion.nav>
 
       {/* "More" Sheet Overlay */}
       <AnimatePresence>

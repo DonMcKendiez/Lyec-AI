@@ -8,13 +8,19 @@ export async function checkForUpdates(): Promise<{ updateAvailable: boolean; lat
   // Simulate a network delay
   await new Promise(resolve => setTimeout(resolve, 2000));
   
-  // For demo purposes, we'll say there's an update available if we're not on 1.3.0
-  const LATEST_VERSION = '1.3.0';
+  const LATEST_VERSION = '1.3.1'; // Bumped version
+  
+  // Check if we've already acknowledged/seen this specific version
+  const lastSeen = localStorage.getItem('lyec_last_update_seen');
   
   return {
-    updateAvailable: (APP_VERSION as string) !== (LATEST_VERSION as string),
+    updateAvailable: APP_VERSION !== LATEST_VERSION && lastSeen !== LATEST_VERSION,
     latestVersion: LATEST_VERSION
   };
+}
+
+export function acknowledgeUpdate(version: string) {
+  localStorage.setItem('lyec_last_update_seen', version);
 }
 
 /**

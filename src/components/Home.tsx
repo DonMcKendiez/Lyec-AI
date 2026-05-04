@@ -14,18 +14,41 @@ export default function Home({ onNavigate }: { onNavigate?: (tab: any) => void }
   const [selectedItem, setSelectedItem] = useState<ShowcaseItem | null>(null);
   const [postContent, setPostContent] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [loadingItems, setLoadingItems] = useState(true);
+  const [loadingItems, setLoadingItems] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const loaderRef = useRef<HTMLDivElement>(null);
+
+  const loadMoreItems = async () => {
+    if (loadingItems) return;
+    setLoadingItems(true);
+    try {
+      // For now, we simulate finding more items if they are not enough in the static list
+      // In a real app, this would fetch from Firestore with pagination
+      const currentItems = await getShowcaseItems();
+      // To simulate infinite, we just keep adding them (shuffled or rotated)
+      const rotated = [...currentItems].sort(() => Math.random() - 0.5);
+      setItems(prev => [...prev, ...rotated]);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoadingItems(false);
+    }
+  };
 
   useEffect(() => {
-    setLoadingItems(true);
-    const unsubscribe = subscribeShowcaseItems((newItems) => {
-      setItems(newItems);
-      setLoadingItems(false);
-    });
-
-    return () => unsubscribe();
+    loadMoreItems();
   }, []);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && !loadingItems) {
+        loadMoreItems();
+      }
+    }, { threshold: 0.1 });
+
+    if (loaderRef.current) observer.observe(loaderRef.current);
+    return () => observer.disconnect();
+  }, [loadingItems]);
 
   const filteredItems = items.filter(item => 
     activeFilter === 'all' || item.category === activeFilter
@@ -150,6 +173,11 @@ export default function Home({ onNavigate }: { onNavigate?: (tab: any) => void }
               ))
             )
           )}
+        </div>
+        
+        <div ref={loaderRef} className="py-20 flex flex-col items-center justify-center gap-4">
+          <Loader2 className="w-10 h-10 text-stone-200 animate-spin" />
+          <p className="text-[9px] font-black text-stone-300 uppercase tracking-[0.4em]">Deciphering more artifacts...</p>
         </div>
       </section>
 

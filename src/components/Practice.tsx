@@ -25,37 +25,46 @@ const TOPICS = [
   { id: 'food', title: 'Food & Dining', icon: <MapPin className="w-4 h-4" />, description: 'Traditional meals and eating' },
 ];
 
+interface Drill {
+  id: string;
+  type: 'translate' | 'multiple-choice' | 'pronunciation';
+  question: string;
+  options?: string[];
+  correctAnswer: string;
+  nativeText?: string;
+  localText?: string;
+  explanation: string;
+}
+
 export default function Practice() {
   const { profile } = useAuth();
-  const [lesson, setLesson] = useState<LessonData | null>(null);
+  const [drills, setDrills] = useState<Drill[]>([]);
   const [loading, setLoading] = useState(false);
-  const [quizIndex, setQuizIndex] = useState(0);
-  const [selectedOption, setSelectedOption] = useState<number | null>(null);
-  const [showExplanation, setShowExplanation] = useState(false);
-  const [score, setScore] = useState(0);
-  const [finished, setFinished] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState<number | null>(null);
-  const [isRecording, setIsRecording] = useState<number | null>(null);
-  const [evaluating, setEvaluating] = useState<number | null>(null);
-  const [feedback, setFeedback] = useState<{ [key: number]: string }>({});
-  
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  const [lastTopic, setLastTopic] = useState('Greetings');
+  const [drillAnswers, setDrillAnswers] = useState<{ [id: string]: { selected: any; isCorrect: boolean; showExplanation: boolean } }>({});
+  const loaderRef = useRef<HTMLDivElement>(null);
 
-  const startLesson = async (topic: string) => {
+  const generateDrills = async (topic: string) => {
+    if (loading) return;
     setLoading(true);
-    setLesson(null);
-    setFinished(false);
-    setScore(0);
-    setQuizIndex(0);
-    setFeedback({});
     try {
-      const data = await generateLessonContent(
-        topic, 
+      const response = await generateLessonContent(
+        `Generate 5 short interactive drills for the topic: ${topic}. Each drill should be a small object with type, question, options, correctAnswer, and explanation.`,
         profile?.targetLanguage || 'Acholi',
         profile?.nativeLanguage || 'English'
       );
-      setLesson(data);
+      
+      // Adapt the lesson generator to create random drills
+      const newDrills: Drill[] = response.quiz.map((q: any, i: number) => ({
+        id: Math.random().toString(36).substr(2, 9),
+        type: Math.random() > 0.5 ? 'multiple-choice' : 'translate',
+        question: q.question,
+        options: q.options,
+        correctAnswer: q.options[q.correctIndex],
+        explanation: q.explanation
+      }));
+
+      setDrills(prev => [...prev, ...newDrills]);
     } catch (error) {
       console.error(error);
     } finally {
@@ -63,319 +72,122 @@ export default function Practice() {
     }
   };
 
-  const handlePhrasePlay = async (text: string, index: number) => {
-    if (isSpeaking !== null) return;
-    setIsSpeaking(index);
-    try {
-      const base64 = await speakLanguage(text, profile?.targetLanguage || 'Acholi');
-      if (base64) {
-        await playPCMAudio(base64);
+  useEffect(() => {
+    generateDrills(lastTopic);
+  }, []);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && !loading) {
+        generateDrills(lastTopic);
       }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsSpeaking(null);
-    }
-  };
+    }, { threshold: 0.5 });
 
-  const startRecording = async (index: number) => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
+    if (loaderRef.current) observer.observe(loaderRef.current);
+    return () => observer.disconnect();
+  }, [loading, lastTopic]);
 
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
-      };
-
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType });
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-          const base64 = (reader.result as string).split(',')[1];
-          await analyzePronunciation(index, { data: base64, mimeType: mediaRecorder.mimeType });
-        };
-        reader.readAsDataURL(audioBlob);
-        stream.getTracks().forEach(track => track.stop());
-      };
-
-      mediaRecorder.start();
-      setIsRecording(index);
-    } catch (err) {
-      console.error("Error accessing microphone:", err);
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording !== null) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(null);
-    }
-  };
-
-  const analyzePronunciation = async (index: number, audio: { data: string; mimeType: string }) => {
-    if (!lesson) return;
-    setEvaluating(index);
-    try {
-      const result = await evaluatePronunciation(
-        lesson.phrases[index].local || (lesson.phrases[index] as any).acholi, 
-        audio,
-        profile?.level || 1,
-        profile?.targetLanguage || 'Acholi'
-      );
-      setFeedback(prev => ({ ...prev, [index]: result }));
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setEvaluating(null);
-    }
-  };
-
-  const handleAnswer = (index: number) => {
-    if (selectedOption !== null) return;
-    const isCorrect = index === lesson?.quiz[quizIndex].correctIndex;
-    setSelectedOption(index);
-    if (isCorrect) {
-      setScore(s => s + 1);
-    }
-    setShowExplanation(true);
-  };
-
-  const nextQuestion = () => {
-    if (quizIndex < (lesson?.quiz.length || 0) - 1) {
-      setQuizIndex(q => q + 1);
-      setSelectedOption(null);
-      setShowExplanation(false);
-    } else {
-      setFinished(true);
-    }
+  const handleAnswerDrill = (drill: Drill, selected: any) => {
+    const isCorrect = selected === drill.correctAnswer;
+    setDrillAnswers(prev => ({
+      ...prev,
+      [drill.id]: { selected, isCorrect, showExplanation: true }
+    }));
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto p-4 flex flex-col gap-8">
-      <div className="text-center space-y-2 mb-8">
-        <div className="inline-flex items-center gap-2 px-3 py-1 bg-brand-primary/10 rounded-full text-[10px] font-black uppercase tracking-[0.3em] text-brand-primary">
-          <Logo size={12} />
-          Heritage Training
+    <div className="w-full max-w-4xl mx-auto p-4 flex flex-col gap-12 pb-32">
+      <div className="text-center space-y-4 mb-8">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-brand-primary/10 rounded-full text-[9px] font-black uppercase tracking-[0.4em] text-brand-primary">
+          <Sparkles className="w-3 h-3" />
+          Infinite Archive Drills
         </div>
-        <h2 className="text-4xl font-display italic font-black text-brand-text">Knowledge Path</h2>
-        <p className="text-stone-400 font-medium">Interactive oral traditions and language modules.</p>
+        <h2 className="text-5xl md:text-7xl font-display italic font-black text-brand-text tracking-tighter leading-none">
+          Legacy <span className="text-brand-primary">Gym</span>
+        </h2>
+        <p className="text-stone-400 font-medium max-w-sm mx-auto text-sm leading-relaxed italic">
+          The archive will never stop testing you. Keep scrolling to uncover ancestral wisdom.
+        </p>
       </div>
 
-      {!lesson && !loading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          {TOPICS.map((topic) => (
-            <button
-              key={topic.id}
-              onClick={() => startLesson(topic.title)}
-              className="p-8 bg-white rounded-[2rem] border border-brand-border shadow-sm hover:shadow-xl hover:border-brand-primary transition-all text-left flex items-start gap-6 group relative overflow-hidden"
-            >
-              <div className="absolute top-0 right-0 p-8 text-stone-50/50 group-hover:text-brand-primary/5 transition-colors">
-                {topic.icon}
+      <div className="space-y-8">
+        {drills.map((drill, idx) => (
+          <motion.div
+            key={drill.id}
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            className="interactive-card overflow-hidden group"
+          >
+            <div className="p-8 md:p-12 space-y-8">
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-black uppercase tracking-widest text-stone-300">Phase {idx + 1}</span>
+                <div className="w-8 h-1 bg-stone-100 rounded-full" />
               </div>
-              <div className="p-4 bg-stone-50 rounded-2xl text-brand-primary group-hover:bg-brand-primary group-hover:text-white transition-all shadow-inner relative z-10">
-                {React.cloneElement(topic.icon as React.ReactElement<any>, { className: 'w-6 h-6' })}
-              </div>
-              <div className="flex-1 relative z-10">
-                <h3 className="font-display italic font-black text-xl text-brand-text uppercase tracking-tight">{topic.title}</h3>
-                <p className="text-[13px] text-stone-400 font-medium mt-1 leading-relaxed">{topic.description}</p>
-              </div>
-              <ChevronRight className="w-6 h-6 text-stone-200 self-center group-hover:text-brand-primary group-hover:translate-x-2 transition-all relative z-10" />
-            </button>
-          ))}
-        </div>
-      )}
-
-      {loading && (
-        <div className="flex flex-col items-center justify-center py-24 gap-4">
-          <Loader2 className="w-12 h-12 text-brand-primary animate-spin" />
-          <p className="font-bold uppercase tracking-widest text-brand-text/40 text-xs">Preparing your personalized Lyec AI lesson...</p>
-        </div>
-      )}
-
-      {lesson && !finished && (
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="space-y-10"
-        >
-          {/* Phrases Section */}
-          <div className="interactive-card p-8 md:p-12 bg-white space-y-10">
-            <div className="flex items-center gap-2 px-3 py-1 bg-brand-primary/10 rounded-full text-[10px] font-black uppercase tracking-[0.3em] text-brand-primary w-fit">
-              <BookOpen className="w-3 h-3" />
-              Bilingual Oral Archive
-            </div>
-            
-            <h2 className="text-5xl font-display italic font-black text-brand-text tracking-tighter">{lesson.title}</h2>
-            
-            <div className="grid gap-6">
-              {lesson.phrases.map((p, i) => (
-                <div key={i} className="group border-b border-stone-100 last:border-0 pb-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-2">
-                       <h3 className="text-2xl font-display italic font-black text-brand-primary leading-none uppercase">{p.local || (p as any).acholi}</h3>
-                       <p className="text-lg font-medium text-stone-400 italic">“{p.native || (p as any).english}”</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="hidden md:block font-mono text-[10px] font-bold text-stone-200 tracking-[0.2em] uppercase">[{p.pronunciation}]</span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handlePhrasePlay(p.local || (p as any).acholi, i)}
-                          className={`p-4 bg-white border border-stone-100 rounded-full shadow-sm hover:shadow-lg hover:border-brand-primary hover:text-brand-primary transition-all active:scale-90 ${
-                            isSpeaking === i ? 'text-brand-primary ring-4 ring-brand-primary/10' : 'text-stone-300'
-                          }`}
-                          title="Listen"
-                        >
-                          <Volume2 className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={() => isRecording === i ? stopRecording() : startRecording(i)}
-                          className={`p-4 rounded-full border transition-all active:scale-90 ${
-                            isRecording === i 
-                              ? 'bg-red-500 text-white animate-pulse shadow-lg' 
-                              : evaluating === i
-                              ? 'bg-stone-50 text-stone-400 animate-spin'
-                              : 'bg-white border-stone-100 text-stone-300 hover:text-brand-primary hover:border-brand-primary'
-                          }`}
-                          title="Record for feedback"
-                        >
-                          {evaluating === i ? <Activity className="w-5 h-5" /> : isRecording ===i ? <Square className="w-5 h-5 fill-current" /> : <Mic className="w-5 h-5" />}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  <AnimatePresence>
-                    {feedback[i] && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        className="mt-4 p-4 bg-brand-primary/5 rounded-2xl border border-brand-primary/10 flex items-start gap-3"
-                      >
-                         <Sparkles className="w-4 h-4 text-brand-primary shrink-0 mt-0.5" />
-                         <p className="text-xs font-medium text-brand-text/70 italic leading-relaxed">
-                           {feedback[i]}
-                         </p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              ))}
-            </div>
-
-            <div className="bg-stone-50 p-8 rounded-[2rem] border border-brand-border relative overflow-hidden group">
-              <MapPin className="absolute -top-6 -right-6 w-32 h-32 text-brand-primary/5 group-hover:scale-110 transition-transform duration-700" />
-              <div className="relative z-10 space-y-2">
-                <h4 className="text-[10px] font-black text-brand-primary uppercase tracking-[0.3em] mb-4">Historical Insight</h4>
-                <p className="text-xl font-display italic font-black text-brand-text leading-snug">{lesson.culturalTip}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Quiz Section */}
-          <div className="bg-brand-text p-8 md:p-12 rounded-[3.5rem] text-white shadow-2xl relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-96 h-96 bg-brand-primary/20 rounded-full -mr-32 -mt-32 blur-3xl transition-transform group-hover:scale-110" />
-            
-            <div className="flex items-center justify-between mb-10 relative z-10">
-              <div className="space-y-1">
-                <h3 className="text-2xl font-display italic font-black uppercase tracking-tight">Vetting Session</h3>
-                <p className="text-[10px] font-black text-brand-primary uppercase tracking-widest">Verify your knowledge</p>
-              </div>
-              <div className="px-5 py-2 bg-white/10 rounded-full text-[11px] font-black uppercase tracking-widest border border-white/10">
-                Phase {quizIndex + 1} of {lesson.quiz.length}
-              </div>
-            </div>
-
-            <div className="relative z-10 mb-10">
-              <p className="text-3xl font-display italic font-black leading-tight border-l-4 border-brand-primary pl-6 py-2">{lesson.quiz[quizIndex].question}</p>
-            </div>
-
-            <div className="grid gap-4 relative z-10">
-              {lesson.quiz[quizIndex].options.map((opt, i) => {
-                const isCorrect = i === lesson.quiz[quizIndex].correctIndex;
-                const isSelected = selectedOption === i;
+              
+              <div className="space-y-6">
+                <h3 className="text-3xl font-display italic font-black text-brand-text leading-tight max-w-2xl">
+                  {drill.question}
+                </h3>
                 
-                return (
-                  <button
-                    key={i}
-                    disabled={selectedOption !== null}
-                    onClick={() => handleAnswer(i)}
-                    className={`p-6 rounded-[1.5rem] text-left transition-all border-2 font-display italic text-xl font-bold flex items-center justify-between ${
-                      selectedOption === null 
-                        ? 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-brand-primary' 
-                        : isCorrect
-                          ? 'bg-emerald-500 border-emerald-500 shadow-xl shadow-emerald-500/20' 
-                          : isSelected 
-                            ? 'bg-red-500 border-red-500 shadow-xl shadow-red-500/20' 
-                            : 'bg-white/5 border-white/10 opacity-30'
-                    }`}
-                  >
-                    <span>{opt}</span>
-                    <AnimatePresence>
-                      {selectedOption !== null && isCorrect && (
-                        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
-                          <CheckCircle2 className="w-6 h-6 text-white" />
-                        </motion.div>
-                      )}
-                      {selectedOption !== null && isSelected && !isCorrect && (
-                        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
-                          <XCircle className="w-6 h-6 text-white" />
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </button>
-                );
-              })}
-            </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {drill.options?.map((opt, i) => {
+                    const ans = drillAnswers[drill.id];
+                    const isSelected = ans?.selected === opt;
+                    const isCorrect = opt === drill.correctAnswer;
+                    
+                    return (
+                      <button
+                        key={i}
+                        disabled={!!ans}
+                        onClick={() => handleAnswerDrill(drill, opt)}
+                        className={`p-6 rounded-[2rem] text-left transition-all border-2 font-display italic text-lg font-bold flex items-center justify-between active:scale-95 ${
+                          !ans 
+                            ? 'bg-stone-50 border-stone-100 hover:border-brand-primary text-brand-text' 
+                            : isCorrect
+                              ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/20' 
+                              : isSelected 
+                                ? 'bg-red-500 border-red-500 text-white' 
+                                : 'bg-stone-50 border-stone-100 opacity-40 grayscale'
+                        }`}
+                      >
+                        <span>{opt}</span>
+                        {ans && isCorrect && <CheckCircle2 className="w-5 h-5" />}
+                        {ans && isSelected && !isCorrect && <XCircle className="w-5 h-5" />}
+                      </button>
+                    );
+                  })}
+                </div>
 
-            <AnimatePresence>
-              {showExplanation && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  className="mt-10 p-2 bg-white/5 rounded-3xl border border-white/5 overflow-hidden"
-                >
-                  <div className="p-8 space-y-8">
-                    <p className="text-xl font-medium italic opacity-60 leading-relaxed text-center">“{lesson.quiz[quizIndex].explanation}”</p>
-                    <button
-                      onClick={nextQuestion}
-                      className="w-full py-5 bg-white text-brand-text rounded-2xl font-black uppercase tracking-[0.3em] text-[11px] hover:bg-stone-100 hover:scale-[1.02] active:scale-95 transition-all shadow-xl flex items-center justify-center gap-3 group/btn"
+                <AnimatePresence>
+                  {drillAnswers[drill.id]?.showExplanation && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      className="bg-brand-primary/5 rounded-[2rem] border border-brand-primary/10 overflow-hidden"
                     >
-                      Advance Forward <ChevronRight className="w-4 h-4 group-hover/btn:translate-x-2 transition-transform" />
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </motion.div>
-      )}
+                      <div className="p-8 flex items-start gap-4">
+                        <Sparkles className="w-5 h-5 text-brand-primary shrink-0 mt-1" />
+                        <div className="space-y-2">
+                           <p className="text-[9px] font-black text-brand-primary uppercase tracking-widest">Heritage Insight</p>
+                           <p className="text-sm font-medium text-brand-text/80 leading-relaxed italic">
+                             {drill.explanation}
+                           </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </div>
 
-      {finished && (
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-white p-12 rounded-3xl border border-brand-border shadow-2xl text-center space-y-6"
-        >
-          <div className="inline-flex p-8 bg-brand-primary/10 rounded-full text-brand-primary shadow-inner">
-            <Trophy className="w-16 h-16" />
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-4xl font-black text-brand-text uppercase tracking-tighter italic">Lek Complete!</h2>
-            <p className="text-xl text-stone-500 font-medium">
-              Score: <span className="text-brand-primary font-black">{score}</span> / <span className="font-black">{lesson?.quiz.length}</span>
-            </p>
-          </div>
-          <div className="pt-8">
-            <button
-              onClick={() => { setLesson(null); setFinished(false); }}
-              className="px-12 py-4 bg-brand-primary text-white rounded-2xl font-black uppercase tracking-widest hover:bg-brand-primary-hover transition-all shadow-xl shadow-brand-primary/20"
-            >
-              Start New Lesson
-            </button>
-          </div>
-        </motion.div>
-      )}
+      <div ref={loaderRef} className="py-20 flex flex-col items-center justify-center gap-4">
+        <Loader2 className="w-10 h-10 text-stone-200 animate-spin" />
+        <p className="text-[9px] font-black text-stone-300 uppercase tracking-[0.4em]">Archiving further tests...</p>
+      </div>
     </div>
   );
 }
