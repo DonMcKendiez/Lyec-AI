@@ -18,7 +18,10 @@
 
 @layer base {
   body {
-    @apply bg-brand-bg text-brand-text font-sans antialiased selection:bg-brand-primary/20 selection:text-brand-primary;
+    @apply bg-brand-bg text-brand-text font-sans antialiased selection:bg-brand-primary/20 selection:text-brand-primary min-h-screen;
+    background-image: radial-gradient(#d1d1d1 0.5px, transparent 0.5px), radial-gradient(#d1d1d1 0.5px, #f9f8f4 0.5px);
+    background-size: 20px 20px;
+    background-position: 0 0, 10px 10px;
   }
 }
 

@@ -45,12 +45,17 @@ function AppContent() {
   
   const [showBars, setShowBars] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
+  const [isScrollingUp, setIsScrollingUp] = useState(false);
   const mainScrollRef = useRef<HTMLElement>(null);
   
   const { user, profile, isAdmin, loading, signOut } = useAuth();
   const { notify } = useNotification();
 
-  const lastRemindedMinute = useRef<string>('');
+  // Reset bars on tab change
+  useEffect(() => {
+    setShowBars(true);
+    if (mainScrollRef.current) mainScrollRef.current.scrollTop = 0;
+  }, [activeTab]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -58,12 +63,15 @@ function AppContent() {
       if (!container) return;
       
       const currentScrollY = container.scrollTop;
-      const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
+      const velocity = currentScrollY - lastScrollY;
+      const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 100;
 
-      if (currentScrollY > lastScrollY && currentScrollY > 60 && !isAtBottom) {
+      if (velocity > 10 && currentScrollY > 80 && !isAtBottom) {
         setShowBars(false);
-      } else {
+        setIsScrollingUp(false);
+      } else if (velocity < -20 || isAtBottom || currentScrollY < 20) {
         setShowBars(true);
+        setIsScrollingUp(true);
       }
       setLastScrollY(currentScrollY);
     };
@@ -196,16 +204,21 @@ function AppContent() {
     <div className="min-h-screen flex flex-col bg-brand-bg selection:bg-brand-primary selection:text-white overflow-hidden">
       {/* App Shell Header */}
       <motion.header 
-        animate={{ y: showBars ? 0 : -100 }}
-        transition={{ type: "spring", damping: 25, stiffness: 200 }}
-        className="fixed top-0 inset-x-0 z-40 bg-white/80 backdrop-blur-xl border-b border-stone-100 px-4 h-16 flex items-center justify-between"
+        animate={{ 
+          y: showBars ? 0 : -80,
+          opacity: showBars ? 1 : 0
+        }}
+        transition={{ type: "spring", damping: 30, stiffness: 250 }}
+        className="fixed top-0 inset-x-0 z-40 bg-white/90 backdrop-blur-2xl border-b border-stone-100 px-6 h-20 flex items-center justify-between shadow-sm"
       >
-        <div className="flex items-center gap-3">
-          <button onClick={() => setActiveTab('home')} className="flex items-center gap-2">
-            <Logo size={32} />
-            <div className="flex flex-col -space-y-1 text-left">
-              <span className="text-sm font-black text-brand-text tracking-tighter uppercase italic">Lyec<span className="text-brand-primary">AI</span></span>
-              <span className="text-[7px] font-black uppercase tracking-[0.2em] text-stone-400">Acholi Heritage</span>
+        <div className="flex items-center gap-4">
+          <button onClick={() => setActiveTab('home')} className="flex items-center gap-3 active:scale-95 transition-all">
+            <div className="p-2.5 bg-brand-primary/5 rounded-2xl border border-brand-primary/10 shadow-inner">
+              <Logo size={36} />
+            </div>
+            <div className="flex flex-col -space-y-0.5 text-left">
+              <span className="text-lg font-black text-brand-text tracking-tighter uppercase italic leading-none">Lyec<span className="text-brand-primary">AI</span></span>
+              <span className="text-[8px] font-black uppercase tracking-[0.3em] text-stone-400">Acholi Heritage</span>
             </div>
           </button>
         </div>
@@ -295,24 +308,44 @@ function AppContent() {
       <motion.nav 
         drag="y"
         dragConstraints={{ top: 0, bottom: 0 }}
-        dragElastic={0.1}
+        dragElastic={0.05}
         onDragEnd={(_, info) => {
-          if (info.offset.y < -50) setShowBars(true);
+          if (info.offset.y < -20) setShowBars(true);
+          if (info.offset.y > 20) setShowBars(false);
         }}
-        animate={{ y: showBars ? 0 : 120 }}
+        animate={{ 
+          y: showBars ? 0 : 100,
+          scale: showBars ? 1 : 0.98,
+          opacity: showBars ? 1 : 0.8
+        }}
         transition={{ type: "spring", damping: 30, stiffness: 300 }}
-        className="fixed bottom-0 inset-x-0 z-50 bg-white/80 backdrop-blur-3xl border-t border-stone-100 flex items-end justify-around px-2 pb-safe-bottom h-[72px] md:h-24"
+        className="fixed bottom-0 inset-x-0 z-50 bg-white/95 backdrop-blur-3xl border-t border-stone-100 flex items-end justify-around px-4 pb-safe-bottom h-20 md:h-28 shadow-[0_-8px_30px_rgb(0,0,0,0.06)]"
       >
-        {/* Drawer Handle (Visible when hidden) */}
-        {!showBars && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="absolute -top-12 left-1/2 -translate-x-1/2 w-16 h-10 flex items-center justify-center cursor-grab active:cursor-grabbing"
-          >
-            <div className="w-10 h-1.5 bg-brand-primary/40 rounded-full animate-bounce shadow-sm" />
-          </motion.div>
-        )}
+        {/* Drawer Handle (Visual Indicator) */}
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-10 h-1.5 bg-stone-100 rounded-full md:hidden cursor-grab active:cursor-grabbing" />
+        
+        <AnimatePresence>
+          {!showBars && (
+            <motion.button 
+              initial={{ opacity: 0, y: 10, x: "-50%" }}
+              animate={{ opacity: 1, y: 0, x: "-50%" }}
+              exit={{ opacity: 0, y: 10, x: "-50%" }}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setShowBars(true)}
+              className="absolute -top-14 left-1/2 w-14 h-14 bg-brand-primary text-white rounded-2xl flex items-center justify-center shadow-[0_10px_40px_rgba(242,125,38,0.4)] border-4 border-white active:scale-90 transition-all cursor-pointer z-50"
+            >
+              <LayoutGrid className="w-6 h-6" />
+              <motion.div 
+                animate={{ y: [0, -4, 0] }}
+                transition={{ repeat: Infinity, duration: 1.5 }}
+                className="absolute -top-6 left-1/2 -translate-x-1/2 text-brand-primary font-black text-[8px] uppercase tracking-widest whitespace-nowrap bg-white px-2 py-1 rounded-full shadow-sm"
+              >
+                Reveal Vault
+              </motion.div>
+            </motion.button>
+          )}
+        </AnimatePresence>
         {mainTabs.map((tab) => (
           <button
             key={tab.id}
