@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Utensils, Construction, Tent, ArrowRight, Loader2, X, BookOpen, Coffee, Music, Volume2, Sparkles, Camera } from 'lucide-react';
-import { generateCulturalPost, speakAcholi } from '../lib/gemini';
-import { getShowcaseItems, ShowcaseItem } from '../services/showcaseService';
+import { generateCulturalPost, speakLanguage } from '../lib/gemini';
+import { getShowcaseItems, subscribeShowcaseItems, ShowcaseItem } from '../services/showcaseService';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { playPCMAudio } from '../lib/audio';
@@ -18,31 +18,25 @@ export default function Home({ onNavigate }: { onNavigate?: (tab: any) => void }
   const [speaking, setSpeaking] = useState(false);
 
   useEffect(() => {
-    loadItems();
+    setLoadingItems(true);
+    const unsubscribe = subscribeShowcaseItems((newItems) => {
+      setItems(newItems);
+      setLoadingItems(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const filteredItems = items.filter(item => 
     activeFilter === 'all' || item.category === activeFilter
   );
 
-  const loadItems = async () => {
-    setLoadingItems(true);
-    try {
-      const data = await getShowcaseItems();
-      setItems(data);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoadingItems(false);
-    }
-  };
-
   const handleItemClick = async (item: ShowcaseItem) => {
     setSelectedItem(item);
     setIsLoading(true);
     setPostContent('');
     try {
-      const content = await generateCulturalPost(item.title, profile?.level || 1, profile?.ageMode || 'adult');
+      const content = await generateCulturalPost(item.title, profile?.level || 1, profile?.ageMode || 'adult', profile?.targetLanguage || 'Acholi');
       setPostContent(content);
     } catch (error) {
       console.error(error);
@@ -56,7 +50,7 @@ export default function Home({ onNavigate }: { onNavigate?: (tab: any) => void }
     if (speaking) return;
     setSpeaking(true);
     try {
-      const base64 = await speakAcholi(text);
+      const base64 = await speakLanguage(text, profile?.targetLanguage || 'Acholi');
       if (base64) {
         await playPCMAudio(base64);
       }
@@ -75,52 +69,45 @@ export default function Home({ onNavigate }: { onNavigate?: (tab: any) => void }
   return (
     <div className="w-full max-w-6xl mx-auto p-4 space-y-12">
       {/* Hero Section */}
-      <section className="text-center space-y-4 py-20 relative overflow-hidden">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_50%_-20%,rgba(242,125,38,0.1)_0%,transparent_70%)] pointer-events-none" />
+      <section className="text-center space-y-4 py-12 md:py-20 relative overflow-hidden px-4">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_50%_-20%,rgba(242,125,38,0.15)_0%,transparent_70%)] pointer-events-none" />
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="space-y-6 relative z-10"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="space-y-4 relative z-10"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/50 backdrop-blur-md rounded-full border border-brand-border text-[10px] font-black uppercase tracking-[0.3em] text-brand-primary mb-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white shadow-sm rounded-full border border-stone-100 text-[8px] font-black uppercase tracking-[0.4em] text-brand-primary mb-2">
              <Sparkles className="w-3 h-3" />
-             The Heart of Northern Uganda
+             Archival Heritage
           </div>
-          <h1 className="text-6xl md:text-8xl font-display italic font-black text-brand-text tracking-tighter leading-[0.9]">
+          <h1 className="text-5xl md:text-8xl font-display italic font-black text-brand-text tracking-tighter leading-[0.85]">
             The <span className="text-brand-primary">Luo</span> <br />
-            Legacy <span className="text-stone-300">Archive</span>
+            Legacy <span className="text-stone-300 underline decoration-brand-accent/30 decoration-8 underline-offset-4">Vault</span>
           </h1>
-          <p className="max-w-2xl mx-auto text-stone-500 font-medium text-lg leading-relaxed px-4">
-            A digital sanctuary for Acholi culture. Explore ancient oral traditions, artisanal crafts, and the flavors of our ancestors.
+          <p className="max-w-xl mx-auto text-stone-400 font-medium text-sm md:text-lg leading-relaxed pt-2">
+            Preserving the collective memory of the Acholi people. Discover oral traditions, crafts, and ancestral knowledge.
           </p>
-          <div className="flex justify-center pt-8">
-            <button 
-              onClick={() => onNavigate?.('scan')}
-              className="group relative px-10 py-5 bg-brand-text text-white rounded-full overflow-hidden transition-all hover:scale-105 active:scale-95 shadow-2xl shadow-brand-text/20"
-            >
-              <div className="absolute inset-0 bg-brand-primary translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-              <span className="relative z-10 flex items-center gap-3 font-black uppercase tracking-widest text-sm">
-                Initiate Scanner
-                <Camera className="w-5 h-5" />
-              </span>
-            </button>
-          </div>
         </motion.div>
       </section>
 
       {/* Heritage Feed / Spotlight */}
-      <section className="space-y-10">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <div className="space-y-2">
-            <h2 className="text-4xl font-display italic font-black text-brand-text">Heritage Collections</h2>
-            <p className="text-stone-400 font-medium">Curated artifacts and traditions of the Ker Kwaro Acholi.</p>
+      <section className="space-y-6">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between px-2">
+            <h2 className="text-xl font-display italic font-black text-brand-text">Heritage Collections</h2>
+            <button className="text-[10px] font-black uppercase tracking-widest text-brand-primary underline underline-offset-4">Explore Maps</button>
           </div>
-          <div className="flex flex-wrap gap-2">
+          
+          <div className="flex overflow-x-auto no-scrollbar gap-2 px-2 pb-2">
              {['All', 'Food', 'Wares', 'Dances', 'Stories', 'History'].map(tab => (
                <button 
                  key={tab} 
                  onClick={() => setActiveFilter(tab.toLowerCase())}
-                 className={`px-6 py-2 rounded-full border border-brand-border text-xs font-bold transition-all active:scale-95 shadow-sm ${activeFilter === tab.toLowerCase() ? 'bg-brand-primary text-white border-brand-primary' : 'hover:bg-white'}`}
+                 className={`px-6 py-2.5 rounded-2xl border border-stone-100 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 whitespace-nowrap ${
+                   activeFilter === tab.toLowerCase() 
+                    ? 'bg-brand-primary text-white border-brand-primary shadow-lg shadow-brand-primary/20 scale-105' 
+                    : 'bg-white text-stone-400'
+                 }`}
                >
                  {tab}
                </button>
@@ -128,7 +115,7 @@ export default function Home({ onNavigate }: { onNavigate?: (tab: any) => void }
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 px-2 pb-12">
           {loadingItems ? (
             <div className="col-span-full h-64 flex flex-col items-center justify-center gap-4">
               <Loader2 className="w-12 h-12 text-brand-primary animate-spin" />
@@ -178,12 +165,13 @@ export default function Home({ onNavigate }: { onNavigate?: (tab: any) => void }
               className="absolute inset-0 bg-stone-900/80 backdrop-blur-md" 
             />
             <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full max-w-3xl max-h-[90vh] bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+              initial={{ y: "100%", opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0 }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="relative w-full h-full max-w-3xl bg-white md:rounded-3xl shadow-2xl overflow-hidden flex flex-col md:h-auto md:max-h-[90vh]"
             >
-              <div className="relative h-64 w-full shrink-0 bg-stone-100">
+              <div className="relative h-64 md:h-80 w-full shrink-0 bg-stone-100">
                 <img 
                   src={selectedItem.image} 
                   alt={selectedItem.title} 

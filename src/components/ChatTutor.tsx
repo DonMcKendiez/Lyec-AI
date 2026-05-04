@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, User, Bot, Loader2, Eraser, Sparkles, Mic, Volume2, Square, MessageSquareCode } from 'lucide-react';
+import { Send, User, Bot, Loader2, Eraser, Sparkles, Mic, Volume2, Square, MessageSquareCode, Activity } from 'lucide-react';
 import Logo from './Logo';
-import { createAcholiTutorChat, ChatMessage, speakAcholi } from '../lib/gemini';
+import { createLanguageTutorChat, ChatMessage, speakLanguage, evaluatePronunciation } from '../lib/gemini';
 import { motion, AnimatePresence } from 'motion/react';
 import { playPCMAudio } from '../lib/audio';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,15 +15,15 @@ export default function ChatTutor() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [chat, setChat] = useState<any>(null);
   const [practiceMode, setPracticeMode] = useState(false);
-  const [practiceStatus, setPracticeStatus] = useState<'idle' | 'grading'>('idle');
+  const [practiceStatus, setPracticeStatus] = useState<'idle' | 'grading' | 'analyzing'>('idle');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
   const { profile, updateProfile } = useAuth();
 
   useEffect(() => {
-    setChat(createAcholiTutorChat(profile?.level || 1, profile?.ageMode || 'adult'));
-  }, [profile?.level, profile?.ageMode]);
+    setChat(createLanguageTutorChat(profile?.level || 1, profile?.targetLanguage || 'Acholi', profile?.nativeLanguage || 'English'));
+  }, [profile?.level, profile?.targetLanguage, profile?.nativeLanguage]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -34,6 +34,30 @@ export default function ChatTutor() {
   const handleSend = async (audioData?: { data: string; mimeType: string }) => {
     if ((!input.trim() && !audioData) || isLoading || !chat) return;
 
+    // Handle Practice Mode Pronunciation Evaluation
+    if (practiceMode && audioData) {
+      const lastBotMsg = [...messages].reverse().find(m => m.role === 'model');
+      const targetPhrase = lastBotMsg?.parts[0].text as string || (profile?.targetLanguage || "Acholi");
+      
+      setPracticeStatus('analyzing');
+      setMessages(prev => [...prev, { role: 'user', parts: [{ text: "Analysis recording..." }] }]);
+      setIsLoading(true);
+
+      try {
+        const feedback = await evaluatePronunciation(targetPhrase, audioData, profile?.level || 1, profile?.targetLanguage || 'Acholi');
+        setMessages(prev => [...prev, { role: 'model', parts: [{ text: `PRONUNCIATION ANALYSIS:\n${feedback}` }] }]);
+        if (updateProfile) {
+          updateProfile({ xp: (profile?.xp || 0) + 100 });
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setIsLoading(false);
+        setPracticeStatus('idle');
+      }
+      return;
+    }
+
     const userMessage = input || (practiceMode ? "Recording for evaluation..." : "Sent an audio message");
     if (!audioData) setInput('');
     
@@ -42,11 +66,11 @@ export default function ChatTutor() {
 
     try {
       const promptPrefix = practiceMode 
-        ? "Evaluate my Acholi pronunciation and grammar based on this audio/text. Be a helpful but strict teacher. Score me out of 10. Focus on phonetics."
-        : audioData ? "Translate and respond to this audio message in Acholi:" : "";
+        ? `Evaluate my ${profile?.targetLanguage || 'Acholi'} pronunciation and grammar based on this audio/text. Be a helpful but strict teacher. Score me out of 10. Focus on phonetics.`
+        : audioData ? `Translate and respond to this audio message in ${profile?.targetLanguage || 'Acholi'}:` : "";
 
       const response = await chat.sendMessage({ 
-        message: audioData ? { parts: [{ text: promptPrefix || "Respond in Acholi:" }, { inlineData: audioData }] } : (promptPrefix + userMessage)
+        message: audioData ? { parts: [{ text: promptPrefix || `Respond in ${profile?.targetLanguage || 'Acholi'}:` }, { inlineData: audioData }] } : (promptPrefix + userMessage)
       });
       const botText = response.text;
       setMessages(prev => [...prev, { role: 'model', parts: [{ text: botText }] }]);
@@ -72,7 +96,7 @@ export default function ChatTutor() {
     if (isSpeaking !== null) return;
     setIsSpeaking(index);
     try {
-      const base64 = await speakAcholi(text);
+      const base64 = await speakLanguage(text, profile?.targetLanguage || 'Acholi');
       if (base64) {
         await playPCMAudio(base64);
       }
@@ -121,12 +145,12 @@ export default function ChatTutor() {
 
   const clearChat = () => {
     setMessages([]);
-    setChat(createAcholiTutorChat(profile?.level || 1, profile?.ageMode || 'adult'));
+    setChat(createLanguageTutorChat(profile?.level || 1, profile?.targetLanguage || 'Acholi', profile?.nativeLanguage || 'English'));
   };
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
-      <div className="text-center space-y-2 mb-8">
+      <div className="text-center space-y-2 mb-4 hidden md:block">
         <div className="flex flex-col items-center gap-4">
           <Logo size={64} />
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-brand-primary/10 rounded-full text-[10px] font-black uppercase tracking-[0.3em] text-brand-primary">
@@ -137,34 +161,34 @@ export default function ChatTutor() {
         <p className="text-stone-400 font-medium">Bilingual oral histories and language guidance.</p>
       </div>
 
-      <div className="interactive-card flex flex-col h-[75vh] bg-stone-50/50">
+      <div className="interactive-card flex flex-col h-[calc(100vh-14rem)] md:h-[75vh] bg-stone-50/50">
         {/* Chat Header */}
-        <div className="p-6 bg-white flex items-center justify-between border-b border-brand-border">
-          <div className="flex items-center gap-4">
+        <div className="p-4 md:p-6 bg-white flex items-center justify-between border-b border-brand-border">
+          <div className="flex items-center gap-3 md:gap-4">
             <div className="relative">
-              <Logo size={48} />
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-4 border-white rounded-full"></div>
+              <Logo size={32} />
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
             </div>
             <div>
-              <h3 className="text-lg font-display italic font-black text-brand-text leading-none">Lyec Intelligence</h3>
-              <p className="text-[10px] font-black text-brand-primary uppercase tracking-widest mt-1">
-                {practiceMode ? '🔥 Practice Mode Active' : 'Acholi Specialist Ready'}
+              <h3 className="text-sm md:text-lg font-display italic font-black text-brand-text leading-none">Lyec Intelligence</h3>
+              <p className="text-[8px] md:text-[10px] font-black text-brand-primary uppercase tracking-widest mt-1">
+                {practiceMode ? '🔥 Practice' : 'Heritage Specialist'}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPracticeMode(!practiceMode)}
-              className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${practiceMode ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'bg-stone-100 text-stone-400 hover:bg-stone-200'}`}
+              className={`px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-widest transition-all ${practiceMode ? 'bg-brand-primary text-white shadow-lg' : 'bg-stone-50 text-stone-400 border border-stone-100'}`}
             >
-              {practiceMode ? 'Exit Practice' : 'Start Practice'}
+              {practiceMode ? 'Exit' : 'Practice'}
             </button>
             <button 
               onClick={clearChat}
-              className="p-3 hover:bg-stone-100 rounded-full transition-all text-stone-300 hover:text-red-500 active:scale-90"
+              className="p-2 hover:bg-stone-50 rounded-xl transition-all text-stone-300 hover:text-red-500"
               title="Wipe Session"
             >
-              <Eraser className="w-5 h-5" />
+              <Eraser className="w-4 h-4 md:w-5 md:h-5" />
             </button>
           </div>
         </div>
@@ -172,22 +196,22 @@ export default function ChatTutor() {
         {/* Messages */}
         <div 
           ref={scrollRef}
-          className="flex-1 overflow-y-auto p-6 space-y-8 no-scrollbar"
+          className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 md:space-y-8 no-scrollbar"
         >
           {messages.length === 0 && (
-            <div className="h-full flex flex-col items-center justify-center text-center space-y-8 max-w-sm mx-auto">
+            <div className="h-full flex flex-col items-center justify-center text-center space-y-6 max-w-sm mx-auto p-4">
               <div className="relative">
-                 <div className="w-24 h-24 bg-white rounded-[2rem] border border-brand-border flex items-center justify-center rotate-6 shadow-xl">
-                   <Bot className="w-12 h-12 text-brand-primary -rotate-6" />
+                 <div className="w-20 h-20 bg-white rounded-[1.5rem] border border-brand-border flex items-center justify-center rotate-6 shadow-lg">
+                   <Bot className="w-10 h-10 text-brand-primary -rotate-6" />
                  </div>
-                 <div className="absolute -top-4 -right-4 w-12 h-12 bg-brand-accent rounded-full flex items-center justify-center -rotate-12 shadow-lg">
-                   <MessageSquareCode className="w-6 h-6 text-brand-text" />
+                 <div className="absolute -top-3 -right-3 w-10 h-10 bg-brand-accent rounded-full flex items-center justify-center -rotate-12 shadow-md">
+                   <MessageSquareCode className="w-5 h-5 text-brand-text" />
                  </div>
               </div>
-              <div className="space-y-3">
-                <h3 className="text-3xl font-display italic font-black text-brand-text leading-tight">"Kop ango?"</h3>
-                <p className="text-stone-400 font-medium leading-relaxed">
-                  I'm your cultural navigator. Ask me about our dances, our food, or let's practice speaking Luo together.
+              <div className="space-y-2">
+                <h3 className="text-2xl font-display italic font-black text-brand-text leading-tight">Heritage Tutor</h3>
+                <p className="text-xs md:text-sm text-stone-400 font-medium leading-relaxed">
+                  I'm your cultural navigator. Ask me about heritage, or let's practice {profile?.targetLanguage || 'Acholi'}.
                 </p>
               </div>
             </div>
@@ -201,24 +225,24 @@ export default function ChatTutor() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <div className={`flex gap-4 max-w-[80%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                  <div className={`p-5 rounded-[2rem] shadow-sm relative group ${
+                <div className={`flex gap-2 max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                  <div className={`p-4 rounded-[1.5rem] shadow-sm relative group ${
                     msg.role === 'user' 
                       ? 'bg-brand-primary text-white rounded-tr-none' 
-                      : 'bg-white text-brand-text border border-brand-border rounded-tl-none'
+                      : 'bg-white text-brand-text border border-stone-100 rounded-tl-none'
                   }`}>
-                    <p className={`text-sm ${msg.role === 'model' ? 'font-medium leading-relaxed' : 'font-semibold'}`}>
+                    <p className={`text-[13px] md:text-sm ${msg.role === 'model' ? 'font-medium leading-relaxed' : 'font-semibold'}`}>
                       {msg.parts[0].text}
                     </p>
                     
                     {msg.role === 'model' && (
                       <button
                         onClick={() => handleVoicePlay(msg.parts[0].text as string, i)}
-                        className={`absolute -right-14 top-1/2 -translate-y-1/2 p-3 bg-white border border-brand-border rounded-full shadow-lg transition-all hover:scale-110 active:scale-90 ${
-                          isSpeaking === i ? 'text-brand-primary ring-4 ring-brand-primary/10' : 'text-stone-300 hover:text-brand-primary'
+                        className={`absolute -right-12 top-1 w-10 h-10 bg-white border border-stone-100 rounded-full shadow-md flex items-center justify-center transition-all active:scale-90 ${
+                          isSpeaking === i ? 'text-brand-primary ring-2 ring-brand-primary/10 animate-pulse' : 'text-stone-300'
                         }`}
                       >
-                        <Volume2 className="w-5 h-5" />
+                        <Volume2 className="w-4 h-4" />
                       </button>
                     )}
                   </div>
@@ -245,39 +269,39 @@ export default function ChatTutor() {
         </div>
 
         {/* Input area */}
-        <div className="p-6 bg-white border-t border-brand-border">
-          <div className="relative flex items-center gap-3 max-w-4xl mx-auto bg-stone-50 rounded-full border border-brand-border px-6 py-2 focus-within:ring-4 focus-within:ring-brand-primary/5 focus-within:border-brand-primary transition-all">
+        <div className="p-4 md:p-6 bg-white border-t border-brand-border">
+          <div className="relative flex items-center gap-2 max-w-4xl mx-auto bg-stone-50 rounded-2xl border border-stone-100 px-4 py-1.5 focus-within:ring-2 focus-within:ring-brand-primary/10 focus-within:border-brand-primary transition-all">
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
               placeholder="Query the Archive..."
-              className="flex-1 bg-transparent border-none focus:ring-0 py-3 text-brand-text placeholder-stone-300 font-medium resize-none max-h-32 text-sm"
+              className="flex-1 bg-transparent border-none focus:ring-0 py-2.5 text-brand-text placeholder-stone-300 font-medium resize-none max-h-32 text-[13px] md:text-sm"
               rows={1}
             />
             
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0">
               {isRecording ? (
                 <button 
                   onClick={stopRecording}
-                  className="w-10 h-10 flex items-center justify-center text-red-500 bg-red-50 rounded-full border border-red-100 animate-pulse active:scale-90 transition-all"
+                  className="w-10 h-10 flex items-center justify-center text-red-500 bg-red-50 rounded-xl border border-red-100 animate-pulse active:scale-90 transition-all"
                 >
-                  <Square className="w-4 h-4 fill-current" />
+                  <Square className="w-3.5 h-3.5 fill-current" />
                 </button>
               ) : (
                 <button 
                   onClick={startRecording}
-                  className="w-10 h-10 flex items-center justify-center text-stone-300 hover:text-brand-primary hover:bg-stone-100 rounded-full transition-all"
+                  className="w-10 h-10 flex items-center justify-center text-stone-300 hover:text-brand-primary hover:bg-stone-50 rounded-xl transition-all"
                   title="Voice Query"
                 >
-                  <Mic className="w-5 h-5" />
+                  <Mic className="w-4 h-4" />
                 </button>
               )}
               
               <button
                 onClick={() => handleSend()}
                 disabled={(!input.trim() && !isRecording) || isLoading}
-                className="w-10 h-10 bg-brand-primary text-white rounded-full flex items-center justify-center shadow-lg shadow-brand-primary/20 hover:bg-brand-primary-hover active:scale-90 disabled:opacity-50 transition-all"
+                className="w-10 h-10 bg-brand-primary text-white rounded-xl flex items-center justify-center shadow-lg shadow-brand-primary/20 hover:bg-brand-primary-hover active:scale-90 disabled:opacity-50 transition-all"
               >
                 <Send className="w-4 h-4" />
               </button>

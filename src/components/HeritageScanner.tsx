@@ -1,24 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Upload, Loader2, Sparkles, X, RefreshCw, Eye, BookOpen, AlertCircle, Volume2, Quote, History, Landmark, Type, Palette, User, Check, Shield, Baby, UserCheck, Download, Share2, Bold, Italic, Underline, Maximize2 } from 'lucide-react';
-import { analyzeAcholiImage, speakAcholi } from '../lib/gemini';
+import { analyzeImage, speakLanguage } from '../lib/gemini';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { playPCMAudio } from '../lib/audio';
 import { useAuth, UserPersona, AgeMode } from '../contexts/AuthContext';
-import { db } from '../lib/firebase';
-import { collection, addDoc, query, where, orderBy, getDocs, deleteDoc, doc, limit } from 'firebase/firestore';
 import { filterProfanity } from '../lib/safety';
+import { addScan, subscribeScans, deleteScan, ScanHistoryItem } from '../services/scanService';
+import { isEncrypted } from '../lib/encryption';
 
-interface ScanHistoryItem {
-  id: string;
-  name: string;
-  thumbnail: string;
-  analysis: string;
-  timestamp: string;
-  uid: string;
-}
+import { registerBiometrics, authenticateBiometrics, isBiometricSupported } from '../lib/biometrics';
+import { encryptData, decryptData, getUserKey } from '../lib/encryption';
 
-export default function AcholiScanner() {
+export default function HeritageScanner() {
   const { user, profile, updateProfile } = useAuth();
   const [image, setImage] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState('');
@@ -30,6 +24,11 @@ export default function AcholiScanner() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showCamera, setShowCamera] = useState(false);
   
+  // Biometric state
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [encryptionActive, setEncryptionActive] = useState(true);
+
   // Overlay state
   const [isEditing, setIsEditing] = useState(false);
   const [overlayText, setOverlayText] = useState('');
@@ -47,6 +46,50 @@ export default function AcholiScanner() {
   const [scanQuality, setScanQuality] = useState<'low' | 'medium' | 'high' | null>(null);
   const [backgroundLearning, setBackgroundLearning] = useState(false);
   const [recentInsight, setRecentInsight] = useState<string | null>(null);
+  
+  // Auto-capture state
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [stillness, setStillness] = useState(0); // 0-100
+  const lastFrameRef = useRef<ImageData | null>(null);
+  const stabilityCounter = useRef(0);
+  const [analyzing, setAnalyzing] = useState(false);
+  
+  // Zoom & Pan state
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef({ x: 0, y: 0 });
+
+  const handleZoom = (delta: number) => {
+    setZoom(prev => Math.min(5, Math.max(1, prev + delta)));
+  };
+
+  const handlePanStart = (e: React.MouseEvent | React.TouchEvent) => {
+    if (zoom <= 1) return;
+    setIsPanning(true);
+    const clientX = 'touches' in e ? (e as React.TouchEvent).touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? (e as React.TouchEvent).touches[0].clientY : (e as React.MouseEvent).clientY;
+    panStartRef.current = { x: clientX - pan.x, y: clientY - pan.y };
+  };
+
+  const handlePanMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isPanning) return;
+    const clientX = 'touches' in e ? (e as React.TouchEvent).touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? (e as React.TouchEvent).touches[0].clientY : (e as React.MouseEvent).clientY;
+    setPan({
+      x: clientX - panStartRef.current.x,
+      y: clientY - panStartRef.current.y
+    });
+  };
+
+  const handlePanEnd = () => {
+    setIsPanning(false);
+  };
+  
+  const resetZoom = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
 
   // Drag state
   const [isDragging, setIsDragging] = useState(false);
@@ -60,23 +103,34 @@ export default function AcholiScanner() {
   useEffect(() => {
     if (profile?.faceVerified) setFaceCheckPassed(true);
     
+    // Subscribe to History
+    let unsubscribe: () => void;
+    if (user?.uid) {
+      unsubscribe = subscribeScans(user.uid, (data) => {
+        setHistory(data);
+      });
+    }
+
     // Simulate background intelligence
     const interval = setInterval(() => {
       if (Math.random() > 0.8 && !loading) {
         const insights = [
-          "Detected Acholi 'O' vowel glottal stop in conversation.",
-          "Updated tone markers for the word 'Coo'.",
-          "Refining accent profile for Gulu-region dialect.",
-          "Noted artifact geometric patterns consistent with Lamogi heritage."
-        ];
+        `Detected ${profile?.targetLanguage || 'Acholi'} linguistic pattern.`,
+        "Updated tone markers for the archive.",
+        "Refining accent profile for regional dialect.",
+        "Noted heritage patterns consistent with regional culture."
+      ];
         const randomInsight = insights[Math.floor(Math.random() * insights.length)];
         setRecentInsight(randomInsight);
         setTimeout(() => setRecentInsight(null), 5000);
       }
     }, 15000);
 
-    return () => clearInterval(interval);
-  }, [profile, loading]);
+    return () => {
+      clearInterval(interval);
+      if (unsubscribe) unsubscribe();
+    };
+  }, [profile, loading, user]);
 
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
 
@@ -108,6 +162,91 @@ export default function AcholiScanner() {
       startCamera();
     }
   }, [facingMode]);
+
+  // Stillness Detection & Auto-Capture Logic
+  useEffect(() => {
+    if (!showCamera || loading || analyzing || isEditing) return;
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    canvas.width = 160;
+    canvas.height = 120;
+
+    let animId: number;
+
+    const checkStillness = () => {
+      if (!videoRef.current || !ctx) return;
+      
+      try {
+        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+        const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        
+        if (lastFrameRef.current) {
+          let diff = 0;
+          const data1 = lastFrameRef.current.data;
+          const data2 = frame.data;
+          
+          for (let i = 0; i < data1.length; i += 32) { // Sparse check for perf
+            diff += Math.abs(data1[i] - data2[i]);
+          }
+          
+          const motionScore = diff / (canvas.width * canvas.height);
+          // Higher motionScore = more movement. 
+          // 0 motion = 100 stillness. 
+          // Noise usually gives motionScore 0.5-1.5. 
+          // Real movement gives 5-20.
+          const currentStillness = Math.max(0, 100 - (motionScore * 10));
+          setStillness(currentStillness);
+
+          // Update scan quality based on stillness
+          if (currentStillness > 92) setScanQuality('high');
+          else if (currentStillness > 75) setScanQuality('medium');
+          else setScanQuality('low');
+
+          // Auto-capture countdown: Only if EXTREMELY steady
+          if (currentStillness > 90) {
+            stabilityCounter.current++;
+            if (stabilityCounter.current > 60) { // Stable for ~2s
+              if (countdown === null) {
+                setCountdown(3);
+              }
+            }
+          } else {
+            // If movement is detected during countdown, reset it
+            if (currentStillness < 80) {
+              stabilityCounter.current = 0;
+              setCountdown(null);
+            }
+          }
+        }
+        
+        lastFrameRef.current = frame;
+      } catch (e) {
+        // Handle cross-origin or video not ready
+      }
+      
+      animId = requestAnimationFrame(checkStillness);
+    };
+
+    animId = requestAnimationFrame(checkStillness);
+    return () => cancelAnimationFrame(animId);
+  }, [showCamera, loading, analyzing, isEditing, countdown]);
+
+  // Countdown timer
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown === 0) {
+      capturePhoto();
+      setCountdown(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setCountdown(prev => (prev !== null ? prev - 1 : null));
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [countdown]);
 
   const stopCamera = () => {
     if (videoRef.current && videoRef.current.srcObject) {
@@ -199,7 +338,7 @@ export default function AcholiScanner() {
     if (!image) return;
     const link = document.createElement('a');
     link.href = image;
-    link.download = `acholi_artifact_${Date.now()}.jpg`;
+    link.download = `heritage_artifact_${Date.now()}.jpg`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -221,6 +360,7 @@ export default function AcholiScanner() {
 
   const analyze = async (dataUrl: string) => {
     setLoading(true);
+    setAnalyzing(true);
     setAnalysis('');
     setError('');
     
@@ -230,28 +370,26 @@ export default function AcholiScanner() {
 
     try {
       const base64Data = dataUrl.split(',')[1];
-      const result = await analyzeAcholiImage(
+      const result = await analyzeImage(
         base64Data, 
-        'image/jpeg', 
+        profile?.targetLanguage || 'Acholi',
         profile?.persona || 'friendly',
         profile?.ageMode || 'adult',
         profile?.level || 1
       );
       setAnalysis(result);
       
-      // Save to History
+      // Save to History (Encrypted if active)
       if (user) {
         const titleMatch = result.match(/### Identification\n\s*\*(.*?)\*/);
         const name = titleMatch ? titleMatch[1] : 'Unknown Artifact';
         
-        await addDoc(collection(db, 'scans'), {
+        await addScan({
           uid: user.uid,
-          name,
+          name: name,
           thumbnail: dataUrl,
-          analysis: result,
-          timestamp: new Date().toISOString()
-        });
-        loadHistory();
+          analysis: result
+        }, encryptionActive);
       }
 
       // Earn XP: Lesson completion etc.
@@ -266,27 +404,61 @@ export default function AcholiScanner() {
       setError("Failed to analyze image. Please try again.");
     } finally {
       setLoading(false);
+      setAnalyzing(false);
     }
   };
 
   const initiateFaceScan = async () => {
+    if (!user) return;
+    setIsAuthenticating(true);
     setScanningFace(true);
-    setFaceCheckPassed(false);
-    // Mock face scan logic
-    setTimeout(() => {
-      setScanningFace(false);
-      setFaceCheckPassed(true);
-      if (updateProfile) {
-        updateProfile({ faceVerified: true });
+    setError('');
+
+    try {
+      if (isBiometricSupported()) {
+        await registerBiometrics(user.uid, user.displayName || user.email || 'Heritage User');
+        setFaceCheckPassed(true);
+        if (updateProfile) {
+          updateProfile({ faceVerified: true });
+        }
+      } else {
+        // Fallback to mock for environments where WebAuthn is unavailable
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        setFaceCheckPassed(true);
+        if (updateProfile) {
+          updateProfile({ faceVerified: true });
+        }
       }
-    }, 3000);
+    } catch (err: any) {
+      console.error(err);
+      setError("Biometric verification failed: " + (err.message || "Unknown error"));
+    } finally {
+      setIsAuthenticating(false);
+      setScanningFace(false);
+    }
+  };
+
+  const verifyForVault = async () => {
+    if (!user) return false;
+    setIsAuthenticating(true);
+    try {
+      if (isBiometricSupported() && profile?.faceVerified) {
+        await authenticateBiometrics();
+        return true;
+      }
+      return profile?.faceVerified; // Fallback to profile flag if API fails
+    } catch (err) {
+      return false;
+    } finally {
+      setIsAuthenticating(false);
+    }
   };
 
   const playAudio = async () => {
     if (!analysis || speaking) return;
     setSpeaking(true);
     try {
-      const audioData = await speakAcholi(analysis);
+      const audioData = await speakLanguage(analysis, profile?.targetLanguage || 'Acholi');
       if (audioData) {
         await playPCMAudio(audioData);
       }
@@ -305,22 +477,6 @@ export default function AcholiScanner() {
     setOverlayText('');
     setTextPosition({ x: 50, y: 50 });
     stopCamera();
-  };
-
-  const loadHistory = async () => {
-    if (!profile?.uid) return;
-    try {
-      const q = query(
-        collection(db, 'scans'), 
-        where('uid', '==', profile.uid),
-        orderBy('timestamp', 'desc'),
-        limit(20)
-      );
-      const snap = await getDocs(q);
-      setHistory(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ScanHistoryItem)));
-    } catch (e) {
-      console.error("History load failed", e);
-    }
   };
 
   const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
@@ -347,6 +503,27 @@ export default function AcholiScanner() {
     setIsDragging(false);
   };
 
+  // Vault unlocking state
+  const [vaultUnlocked, setVaultUnlocked] = useState(false);
+  const [unlocking, setunlocking] = useState(false);
+
+  const handleVaultUnlock = async () => {
+    setunlocking(true);
+    try {
+      // Simulate/Trigger biometric check
+      const success = await verifyForVault();
+      if (success) {
+        setVaultUnlocked(true);
+      } else {
+        setError("Vault access denied. Biometric signature mismatch.");
+      }
+    } catch (e) {
+      setError("Vault access error.");
+    } finally {
+      setunlocking(false);
+    }
+  };
+
   const personas: UserPersona[] = ['professional', 'friendly', 'bestie', 'colleague'];
 
   return (
@@ -356,8 +533,8 @@ export default function AcholiScanner() {
           <Eye className="w-3.5 h-3.5" />
           Neural Recognition
         </div>
-        <h2 className="text-5xl font-display italic font-black text-brand-text tracking-tighter">Wang Pa Acholi</h2>
-        <p className="text-stone-400 font-medium max-w-lg mx-auto">Analyze artifacts, tools, and foods through the lens of Luo heritage intelligence.</p>
+        <h2 className="text-5xl font-display italic font-black text-brand-text tracking-tighter">Wang Pa Archivist</h2>
+        <p className="text-stone-400 font-medium max-w-lg mx-auto">Analyze artifacts through the lens of {profile?.targetLanguage || 'Acholi'} heritage intelligence.</p>
         
         {/* User Stats/Class */}
         {profile && (
@@ -415,13 +592,33 @@ export default function AcholiScanner() {
                 <div className="p-2.5 bg-brand-primary text-white rounded-xl">
                   <Camera className="w-5 h-5" />
                 </div>
-                <h3 className="text-xs font-black uppercase tracking-widest text-brand-text">Observation Deck</h3>
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-brand-text">Observation Deck</h3>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                    <span className="text-[8px] font-black uppercase tracking-widest text-stone-400">Steady Sensor Active</span>
+                  </div>
+                </div>
               </div>
-              {image && (
-                <button onClick={reset} className="p-2 text-stone-300 hover:text-brand-primary transition-colors">
-                  <RefreshCw className="w-5 h-5" />
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setEncryptionActive(!encryptionActive)}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all ${
+                    encryptionActive 
+                      ? 'bg-brand-primary/5 border-brand-primary text-brand-primary' 
+                      : 'bg-stone-50 border-stone-100 text-stone-400 opacity-60'
+                  }`}
+                  title={encryptionActive ? "AES-256 Active" : "Unencrypted Mode"}
+                >
+                  <Shield className="w-3 h-3" />
+                  <span className="text-[8px] font-black uppercase tracking-widest leading-none">AES-256</span>
                 </button>
-              )}
+                {image && (
+                  <button onClick={reset} className="p-2 text-stone-300 hover:text-brand-primary transition-colors">
+                    <RefreshCw className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
             </header>
 
             <div 
@@ -462,6 +659,63 @@ export default function AcholiScanner() {
                     className="flex-1 w-full h-full object-cover" 
                   />
                   
+                  {/* Quality & Stillness Indicators */}
+                  <div className="absolute top-6 left-6 right-6 flex items-center justify-between pointer-events-none">
+                    <div className="flex flex-col gap-2">
+                       <div className="flex items-center gap-2 px-3 py-1 bg-black/40 backdrop-blur-md rounded-full border border-white/10">
+                          <div className={`w-2 h-2 rounded-full ${
+                            scanQuality === 'high' ? 'bg-green-500 shadow-[0_0_10px_#22c55e]' : 
+                            scanQuality === 'medium' ? 'bg-amber-500 shadow-[0_0_10px_#f59e0b]' : 
+                            'bg-red-500 shadow-[0_0_10px_#ef4444]'
+                          }`} />
+                          <span className="text-[9px] font-black uppercase tracking-widest text-white">Quality: {scanQuality}</span>
+                       </div>
+                       <div className="flex flex-col gap-1 w-32 px-3 py-2 bg-black/40 backdrop-blur-md rounded-2xl border border-white/10">
+                          <span className="text-[8px] font-black uppercase tracking-widest text-white/60">Stillness</span>
+                          <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+                             <motion.div 
+                               initial={{ width: '0%' }}
+                               animate={{ width: `${stillness}%` }}
+                               className={`h-full ${stillness > 90 ? 'bg-green-500' : stillness > 75 ? 'bg-amber-500' : 'bg-brand-primary'}`}
+                             />
+                          </div>
+                       </div>
+                    </div>
+                  </div>
+
+                  {/* Movement Warning */}
+                  <AnimatePresence>
+                    {stillness < 70 && !loading && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute bottom-32 left-1/2 -translate-x-1/2 z-30 pointer-events-none"
+                      >
+                         <div className="bg-red-500/80 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 flex items-center gap-2">
+                           <AlertCircle className="w-3 h-3 text-white" />
+                           <span className="text-[10px] font-black uppercase tracking-tight text-white whitespace-nowrap">Keep camera steady to capture</span>
+                         </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Countdown Overlay */}
+                  <AnimatePresence>
+                    {countdown !== null && (
+                      <motion.div 
+                        initial={{ scale: 2, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.5, opacity: 0 }}
+                        className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none"
+                      >
+                         <div className="text-9xl font-display italic font-black text-white drop-shadow-[0_0_30px_rgba(0,0,0,0.5)]">
+                           {countdown}
+                         </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
                   {scanningFace && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
                       <div className="w-64 h-80 border-2 border-brand-primary rounded-full relative overflow-hidden">
@@ -503,8 +757,50 @@ export default function AcholiScanner() {
               )}
 
               {image && (
-                <div className="absolute inset-0">
-                  <img src={image} className="w-full h-full object-cover" alt="Captured" />
+                <div className="absolute inset-0 overflow-hidden bg-stone-900">
+                  <div 
+                    className={`w-full h-full transition-transform duration-200 ease-out ${zoom > 1 ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                    onMouseDown={handlePanStart}
+                    onMouseMove={handlePanMove}
+                    onMouseUp={handlePanEnd}
+                    onMouseLeave={handlePanEnd}
+                    onTouchStart={handlePanStart}
+                    onTouchMove={handlePanMove}
+                    onTouchEnd={handlePanEnd}
+                    style={{ 
+                      transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+                      transformOrigin: 'center'
+                    }}
+                  >
+                    <img src={image} className="w-full h-full object-contain" alt="Captured" />
+                  </div>
+
+                  {/* Zoom Controls */}
+                  <div className="absolute top-4 right-4 flex flex-col gap-2 z-30">
+                    <button 
+                      onClick={() => handleZoom(0.5)}
+                      className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-xl text-white hover:bg-white/40 border border-white/20 transition-all flex items-center justify-center shadow-lg"
+                      title="Zoom In"
+                    >
+                      <Maximize2 className="w-5 h-5" />
+                    </button>
+                    <button 
+                      onClick={() => handleZoom(-0.5)}
+                      className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-xl text-white hover:bg-white/40 border border-white/20 transition-all flex items-center justify-center shadow-lg"
+                      title="Zoom Out"
+                    >
+                      <RefreshCw className={`w-5 h-5 ${zoom === 1 ? 'opacity-30' : ''}`} />
+                    </button>
+                    {zoom > 1 && (
+                      <button 
+                        onClick={resetZoom}
+                        className="w-10 h-10 bg-brand-primary text-white rounded-xl shadow-lg flex items-center justify-center animate-in fade-in zoom-in"
+                        title="Reset Zoom"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    )}
+                  </div>
                   
                   {isEditing && (
                     <div className="absolute inset-0 bg-black/40 backdrop-blur-sm p-4 flex flex-col">
@@ -535,13 +831,24 @@ export default function AcholiScanner() {
                   {loading && (
                     <div className="absolute inset-0 bg-brand-text/80 backdrop-blur-md flex flex-col items-center justify-center gap-6 text-white text-center p-8">
                        <Loader2 className="w-12 h-12 animate-spin text-brand-primary" />
-                       <div className="space-y-2">
+                       <div className="space-y-4">
                          <p className="font-black text-xs uppercase tracking-[0.4em]">Deciphering Heritage</p>
                          {scanQuality && (
                            <div className="flex items-center justify-center gap-2">
                              <div className={`h-1 w-8 rounded-full ${scanQuality === 'high' ? 'bg-green-500' : 'bg-yellow-500'}`} />
                              <span className="text-[8px] font-bold uppercase tracking-widest opacity-60">Signal Quality: {scanQuality}</span>
                            </div>
+                         )}
+
+                         {encryptionActive && (
+                            <motion.div 
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              className="flex items-center justify-center gap-2 px-3 py-1 bg-brand-primary/20 rounded-full border border-brand-primary/30"
+                            >
+                              <Shield className="w-3 h-3 text-brand-primary" />
+                              <span className="text-[7px] font-black uppercase tracking-widest text-brand-primary">AES-256 Masking Active</span>
+                            </motion.div>
                          )}
                        </div>
                     </div>
@@ -636,45 +943,56 @@ export default function AcholiScanner() {
                      <h4 className="text-[10px] font-black uppercase tracking-widest text-brand-text/50">Intelligence Settings</h4>
                    </div>
                    
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <div className="space-y-2">
-                       <label className="text-[9px] font-black uppercase tracking-widest text-stone-400 block px-1">Persona</label>
-                       <select 
-                         value={profile?.persona || 'friendly'}
-                         onChange={(e) => updateProfile?.({ persona: e.target.value as UserPersona })}
-                         className="w-full bg-stone-50 border border-stone-100 rounded-2xl p-3 text-[10px] font-black uppercase tracking-widest outline-none focus:ring-2 focus:ring-brand-primary/20 appearance-none cursor-pointer"
-                       >
-                         {personas.map(p => (
-                           <option key={p} value={p}>{p}</option>
-                         ))}
-                       </select>
-                     </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black uppercase tracking-widest text-stone-400 block px-1">Persona</label>
+                        <select 
+                          value={profile?.persona || 'friendly'}
+                          onChange={(e) => updateProfile?.({ persona: e.target.value as UserPersona })}
+                          className="w-full bg-stone-50 border border-stone-100 rounded-2xl p-3 text-[10px] font-black uppercase tracking-widest outline-none focus:ring-2 focus:ring-brand-primary/20 appearance-none cursor-pointer"
+                        >
+                          {personas.map(p => (
+                            <option key={p} value={p}>{p}</option>
+                          ))}
+                        </select>
+                      </div>
 
-                     <div className="space-y-2">
-                       <label className="text-[9px] font-black uppercase tracking-widest text-stone-400 block px-1">Content Mode</label>
-                       <div className="flex bg-stone-50 rounded-2xl p-1 border border-stone-100">
-                         <button 
-                           onClick={() => {
-                             if (!profile?.faceVerified) {
-                               alert("Facial Verification Required for Adult Access.");
-                               initiateFaceScan();
-                               return;
-                             }
-                             updateProfile?.({ ageMode: 'adult' });
-                           }}
-                           className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${profile?.ageMode === 'adult' ? 'bg-white shadow-sm text-brand-text' : 'text-stone-300'}`}
-                         >
-                           Adult
-                         </button>
-                         <button 
-                           onClick={() => updateProfile?.({ ageMode: 'children' })}
-                           className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${profile?.ageMode === 'children' ? 'bg-white shadow-sm text-amber-600' : 'text-stone-300'}`}
-                         >
-                           Child
-                         </button>
-                       </div>
-                     </div>
-                   </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black uppercase tracking-widest text-stone-400 block px-1">Content Mode</label>
+                        <div className="flex bg-stone-50 rounded-2xl p-1 border border-stone-100">
+                          <button 
+                            onClick={() => {
+                              if (!profile?.faceVerified) {
+                                alert("Facial Verification Required for Adult Access.");
+                                initiateFaceScan();
+                                return;
+                              }
+                              updateProfile?.({ ageMode: 'adult' });
+                            }}
+                            className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${profile?.ageMode === 'adult' ? 'bg-white shadow-sm text-brand-text' : 'text-stone-300'}`}
+                          >
+                            Adult
+                          </button>
+                          <button 
+                            onClick={() => updateProfile?.({ ageMode: 'children' })}
+                            className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${profile?.ageMode === 'children' ? 'bg-white shadow-sm text-amber-600' : 'text-stone-300'}`}
+                          >
+                            Child
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black uppercase tracking-widest text-stone-400 block px-1">Vault Mode</label>
+                        <button 
+                          onClick={() => setEncryptionActive(!encryptionActive)}
+                          className={`w-full flex items-center justify-center gap-2 p-3 rounded-2xl border transition-all ${encryptionActive ? 'bg-brand-primary/10 border-brand-primary/20 text-brand-primary' : 'bg-stone-50 border-stone-100 text-stone-300'}`}
+                        >
+                          <Shield className="w-3.5 h-3.5" />
+                          <span className="text-[9px] font-black uppercase tracking-widest">{encryptionActive ? 'AES-256 On' : 'Standard'}</span>
+                        </button>
+                      </div>
+                    </div>
                    
                    <button 
                      onClick={initiateFaceScan}
@@ -848,7 +1166,7 @@ export default function AcholiScanner() {
                   <X className="w-5 h-5" />
                 </button>
               </header>
-
+              
               <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                 {history.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
@@ -857,45 +1175,102 @@ export default function AcholiScanner() {
                      </div>
                      <p className="text-stone-400 font-medium italic">No items archived yet.</p>
                   </div>
+                ) : !vaultUnlocked && history.some(item => isEncrypted(item.analysis)) ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center space-y-6">
+                    <div className="w-24 h-24 bg-brand-primary/10 rounded-full flex items-center justify-center text-brand-primary">
+                       <Shield className="w-12 h-12" />
+                    </div>
+                    <div className="space-y-2 px-6">
+                      <h4 className="text-lg font-black text-brand-text">Secure Vault Locked</h4>
+                      <p className="text-xs text-stone-400 font-medium leading-relaxed">
+                        Some entries in your archive are protected with AES-256 encryption. 
+                        Use your biometric signature to decrypt and view them.
+                      </p>
+                    </div>
+                    <button 
+                      onClick={handleVaultUnlock}
+                      disabled={unlocking}
+                      className="group relative px-8 py-5 bg-brand-text text-white rounded-[2rem] font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl hover:shadow-brand-primary/20 transition-all flex flex-col items-center gap-4 disabled:opacity-50 w-full overflow-hidden"
+                    >
+                      {unlocking && (
+                        <motion.div 
+                          initial={{ x: '-100%' }}
+                          animate={{ x: '100%' }}
+                          transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+                          className="absolute inset-x-0 bottom-0 h-1 bg-brand-primary z-10"
+                        />
+                      )}
+                      <div className="w-16 h-16 rounded-full border-2 border-dashed border-white/20 flex items-center justify-center relative">
+                        {unlocking ? (
+                          <div className="relative">
+                             <div className="w-10 h-10 border-2 border-brand-primary rounded-full animate-ping opacity-40" />
+                             <Shield className="w-6 h-6 text-brand-primary animate-pulse absolute inset-0 m-auto" />
+                          </div>
+                        ) : (
+                          <UserCheck className="w-8 h-8 text-white group-hover:scale-110 transition-transform" />
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <span className="block">{unlocking ? 'Attaching Bio-Signature...' : 'Authenticate Identity'}</span>
+                        <p className="text-[8px] opacity-40 font-medium">Luo Heritage Security Layer</p>
+                      </div>
+                    </button>
+                  </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {history.map(item => (
-                      <div 
-                        key={item.id} 
-                        className="group relative bg-stone-50 rounded-3xl overflow-hidden border border-stone-100 hover:border-brand-primary transition-all p-3 flex items-center gap-4"
-                      >
-                        <div className="w-20 h-20 rounded-2xl overflow-hidden bg-white border border-stone-100 flex-shrink-0">
-                          <img src={item.thumbnail} className="w-full h-full object-cover" alt={item.name} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-black text-brand-text uppercase tracking-tight truncate">{item.name}</p>
-                          <p className="text-[10px] text-stone-400 font-medium">
-                            {new Date(item.timestamp).toLocaleDateString()}
-                          </p>
-                          <div className="flex gap-2 mt-2">
-                            <button 
-                              onClick={() => {
-                                setImage(item.thumbnail);
-                                setAnalysis(item.analysis);
-                                setShowHistory(false);
-                              }}
-                              className="text-[9px] font-black uppercase text-brand-primary hover:underline"
-                            >
-                              View
-                            </button>
-                            <button 
-                              onClick={async () => {
-                                await deleteDoc(doc(db, 'scans', item.id));
-                                loadHistory();
-                              }}
-                              className="text-[9px] font-black uppercase text-red-400 hover:underline"
-                            >
-                              Del
-                            </button>
+                    {history.map(item => {
+                      const isItemEncrypted = item.isEncrypted || isEncrypted(item.analysis);
+                      const displayName = isItemEncrypted && user 
+                        ? (vaultUnlocked ? decryptData(item.name, getUserKey(user.uid)) : "[ENCRYPTED]")
+                        : item.name;
+                      
+                      const displayAnalysis = isItemEncrypted && user
+                        ? (vaultUnlocked ? decryptData(item.analysis, getUserKey(user.uid)) : "[LOCKED]")
+                        : item.analysis;
+
+                      return (
+                        <div 
+                          key={item.id} 
+                          className="group relative bg-stone-50 rounded-3xl overflow-hidden border border-stone-100 hover:border-brand-primary transition-all p-3 flex items-center gap-4"
+                        >
+                          <div className="w-20 h-20 rounded-2xl overflow-hidden bg-white border border-stone-100 flex-shrink-0">
+                            <img src={item.thumbnail} className="w-full h-full object-cover" alt={displayName} />
+                            {isItemEncrypted && !vaultUnlocked && (
+                              <div className="absolute inset-0 bg-brand-primary/20 backdrop-blur-[2px] flex items-center justify-center">
+                                <Shield className="w-4 h-4 text-white" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-black text-brand-text uppercase tracking-tight truncate">{displayName}</p>
+                            <p className="text-[10px] text-stone-400 font-medium">
+                              {new Date(item.timestamp).toLocaleDateString()}
+                            </p>
+                            <div className="flex gap-2 mt-2">
+                              <button 
+                                onClick={() => {
+                                  setImage(item.thumbnail);
+                                  setAnalysis(displayAnalysis);
+                                  setShowHistory(false);
+                                }}
+                                disabled={isItemEncrypted && !vaultUnlocked}
+                                className="text-[9px] font-black uppercase text-brand-primary hover:underline disabled:text-stone-300 disabled:no-underline"
+                              >
+                                View
+                              </button>
+                              <button 
+                                onClick={async () => {
+                                  await deleteScan(item.id);
+                                }}
+                                className="text-[9px] font-black uppercase text-red-400 hover:underline"
+                              >
+                                Del
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

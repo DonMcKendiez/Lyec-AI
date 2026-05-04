@@ -1,77 +1,126 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Global Helpers
+    // -------------------------------------------------------------------------
+    // GLOBALS & HELPERS
+    // -------------------------------------------------------------------------
+    
     function isSignedIn() {
       return request.auth != null;
     }
 
     function isEmailVerified() {
-      return isSignedIn() && request.auth.token.email_verified == true;
+      return request.auth != null && request.auth.token.email_verified == true;
     }
 
-    function isBootstrappedAdmin() {
-      return request.auth.token.email == "donmckenz20@gmail.com" && isEmailVerified();
+    function getAdminData() {
+      return get(/databases/$(database)/documents/admins/$(request.auth.uid)).data;
     }
 
     function isAdmin() {
-      return isBootstrappedAdmin() || exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email == "donmckenz20@gmail.com"
+      );
+    }
+
+    function isOwner() {
+      return isAdmin() && (
+        (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'owner') ||
+        request.auth.token.email == "donmckenz20@gmail.com"
+      );
     }
 
     function isValidId(id) {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
-    // Showcase Items
-    match /showcase/{itemId} {
-      function isValidShowcaseItem(data) {
-        return data.keys().hasAll(['title', 'description', 'category', 'image']) &&
-               data.keys().size() >= 4 &&
-               data.title is string && data.title.size() <= 200 &&
-               data.description is string && data.description.size() <= 1000 &&
-               data.category in ['food', 'wares', 'activities'] &&
-               data.image is string && data.image.size() <= 2000;
-      }
-
-      allow list: if true;
-      allow get: if true;
-      
-      allow create: if isAdmin() && isValidShowcaseItem(request.resource.data) && (
-        !('createdAt' in request.resource.data) || request.resource.data.createdAt == request.time
-      );
-
-      allow update: if isAdmin() && isValidShowcaseItem(request.resource.data) && (
-        // Action: Edit
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'description', 'category', 'image', 'updatedAt']) &&
-        (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt == request.time)
-      );
-
-      allow delete: if isAdmin();
+    function incoming() {
+      return request.resource.data;
     }
 
-    // Admin List
+    function existing() {
+      return resource.data;
+    }
+
+    // -------------------------------------------------------------------------
+    // ADMINS COLLECTION
+    // -------------------------------------------------------------------------
     match /admins/{adminId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow read: if isAdmin();
+      
+      allow create: if (isOwner() || (isSignedIn() && !exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && request.auth.token.email == "donmckenz20@gmail.com")) && 
+        isValidId(adminId) &&
+        incoming().uid == adminId &&
+        incoming().role in ['owner', 'admin'] &&
+        incoming().email is string &&
+        incoming().email.size() < 256;
+        
+      allow update: if isOwner() && 
+        incoming().uid == adminId &&
+        incoming().role in ['owner', 'admin'] &&
+        incoming().email == existing().email; // Email is immutable
+        
+      allow delete: if isOwner() && adminId != request.auth.uid;
     }
 
-    // User Profiles
+    // -------------------------------------------------------------------------
+    // SHOWCASE / HERITAGE POSTS
+    // -------------------------------------------------------------------------
+    match /showcase/{itemId} {
+      allow get, list: if true;
+      allow write: if isAdmin() && isValidId(itemId);
+    }
+
+    // -------------------------------------------------------------------------
+    // ANNOUNCEMENTS / DISPATCHES
+    // -------------------------------------------------------------------------
+    match /announcements/{annId} {
+      allow get, list: if true;
+      allow write: if isAdmin() && isValidId(annId);
+    }
+
+    // -------------------------------------------------------------------------
+    // USER PROFILES
+    // -------------------------------------------------------------------------
     match /profiles/{userId} {
-      function isValidProfile(data) {
-        return data.uid == userId;
-      }
-      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin()) && isValidProfile(request.resource.data);
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn() && request.auth.uid == userId &&
+        incoming().uid == userId &&
+        incoming().xp == 0 &&
+        incoming().level == 1; // Prevent self-leveling on create
+      
+      allow update: if isSignedIn() && request.auth.uid == userId &&
+        incoming().uid == userId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['xp', 'level', 'displayName', 'photoURL', 'persona', 'ageMode', 'faceVerified', 'achievements']);
     }
 
-    // Scans History
+    // -------------------------------------------------------------------------
+    // SCANS (HERITAGE RADAR)
+    // -------------------------------------------------------------------------
     match /scans/{scanId} {
-      allow read: if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow create: if isSignedIn() && 
+        incoming().uid == request.auth.uid &&
+        incoming().analysis is string &&
+        incoming().analysis.size() < 10000; // Size limit
       allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
     }
 
-    // Default deny (moved to bottom)
+    // -------------------------------------------------------------------------
+    // EXTENSIONS & INTEGRATIONS
+    // -------------------------------------------------------------------------
+    match /extensions/{extId} {
+       allow read: if isAdmin();
+       allow write: if isAdmin() && isValidId(extId);
+    }
+
+    match /integrations/{intId} {
+       allow read: if isAdmin();
+       allow write: if isAdmin() && isValidId(intId);
+    }
+
+    // Default Deny - Keep at bottom
     match /{document=**} {
       allow read, write: if false;
     }

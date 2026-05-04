@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, onAuthStateChanged } from 'firebase/auth';
+import { User, onAuthStateChanged, deleteUser } from 'firebase/auth';
 import { auth, signInWithGoogle, logOut } from '../lib/firebase';
-import { doc, getDoc, getDocFromServer, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, getDocFromServer, setDoc, updateDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useNotification } from './NotificationContext';
+import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 
 export type UserPersona = 'professional' | 'friendly' | 'bestie' | 'colleague';
 export type AgeMode = 'adult' | 'children';
@@ -16,6 +17,12 @@ export interface UserProfile {
   persona: UserPersona;
   faceVerified: boolean;
   learningLog: string[];
+  learningTime?: string;
+  remindersEnabled?: boolean;
+  nativeLanguage?: string;
+  targetLanguage?: string;
+  encryptionEnabled?: boolean;
+  biometricsEnabled?: boolean;
 }
 
 interface AuthContextType {
@@ -25,6 +32,7 @@ interface AuthContextType {
   loading: boolean;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
 }
 
@@ -38,44 +46,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { notify } = useNotification();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setUser(user);
-      if (user) {
-        // Fetch/Create Profile
-        try {
-          const profileRef = doc(db, 'profiles', user.uid);
-          const profileSnap = await getDoc(profileRef);
-          
-          if (!profileSnap.exists()) {
+    let profileUnsubscribe: (() => void) | undefined;
+
+    const authUnsubscribe = onAuthStateChanged(auth, async (authenticatedUser) => {
+      setUser(authenticatedUser);
+      
+      if (profileUnsubscribe) {
+        profileUnsubscribe();
+        profileUnsubscribe = undefined;
+      }
+
+      if (authenticatedUser) {
+        // Real-time Profile Subscription
+        const profileRef = doc(db, 'profiles', authenticatedUser.uid);
+        profileUnsubscribe = onSnapshot(profileRef, (snap) => {
+          if (snap.exists()) {
+            setProfile(snap.data() as UserProfile);
+          } else {
+            // Create profile if it doesn't exist
             const newProfile: UserProfile = {
-              uid: user.uid,
+              uid: authenticatedUser.uid,
               level: 1,
               xp: 0,
               ageMode: 'adult',
               persona: 'friendly',
               faceVerified: false,
-              learningLog: []
+              learningLog: [],
+              learningTime: '09:00',
+              remindersEnabled: false,
+              nativeLanguage: 'English',
+              targetLanguage: 'Acholi'
             };
-            await setDoc(profileRef, newProfile);
-            setProfile(newProfile);
-          } else {
-            setProfile(profileSnap.data() as UserProfile);
+            setDoc(profileRef, newProfile);
           }
-        } catch (error) {
-          console.error("Error with profile", error);
-        }
+        }, (err) => {
+           handleFirestoreError(err, OperationType.GET, `profiles/${authenticatedUser.uid}`);
+        });
 
         // Check Admin
-        const isBootstrapped = user.email === "donmckenz20@gmail.com";
+        const isAdminPath = `admins/${authenticatedUser.uid}`;
+        const isBootstrapped = authenticatedUser.email === "donmckenz20@gmail.com";
         if (isBootstrapped) {
           setIsAdmin(true);
           setLoading(false);
         } else {
           try {
-            const adminDoc = await getDoc(doc(db, 'admins', user.uid));
+            const adminDoc = await getDoc(doc(db, 'admins', authenticatedUser.uid));
             setIsAdmin(adminDoc.exists());
           } catch (error) {
-            console.error("Error checking admin status", error);
+            handleFirestoreError(error, OperationType.GET, isAdminPath);
             setIsAdmin(false);
           } finally {
             setLoading(false);
@@ -99,11 +118,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
     testConnection();
 
-    return unsubscribe;
+    return () => {
+      authUnsubscribe();
+      if (profileUnsubscribe) profileUnsubscribe();
+    };
   }, []);
 
   const calculateLevel = (xp: number) => {
-    // XP threshold logic: 500, 1500, 4000, 10000...
     if (xp >= 10000) return 5;
     if (xp >= 4000) return 4;
     if (xp >= 1500) return 3;
@@ -111,12 +132,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return 1;
   };
 
+  const deleteAccount = async () => {
+    if (!user) return;
+    const profilePath = `profiles/${user.uid}`;
+    try {
+      // 1. Delete profile from Firestore
+      const profileRef = doc(db, 'profiles', user.uid);
+      await deleteDoc(profileRef);
+      // 2. Delete Auth account
+      await deleteUser(user);
+    } catch (error) {
+       handleFirestoreError(error, OperationType.DELETE, profilePath);
+       throw error;
+    }
+  };
+
   const updateProfile = async (updates: Partial<UserProfile>) => {
     if (!user || !profile) return;
+    const profilePath = `profiles/${user.uid}`;
     try {
       let finalUpdates = { ...updates };
       
-      // If XP is updated, check for Level Up
       if (updates.xp !== undefined) {
         const newLevel = calculateLevel(updates.xp);
         if (newLevel > profile.level) {
@@ -129,7 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await updateDoc(profileRef, finalUpdates);
       setProfile(prev => prev ? { ...prev, ...finalUpdates } : null);
     } catch (error) {
-      console.error("Update profile failed", error);
+       handleFirestoreError(error, OperationType.UPDATE, profilePath);
     }
   };
 
@@ -150,7 +186,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, isAdmin, loading, signIn, signOut: signOutUser, updateProfile }}>
+    <AuthContext.Provider value={{ user, profile, isAdmin, loading, signIn, signOut: signOutUser, deleteAccount, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

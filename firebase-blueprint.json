@@ -17,12 +17,54 @@
     },
     "Admin": {
       "title": "Admin User",
-      "description": "A user with administrative privileges.",
+      "description": "A user with administrative privileges in the digital archive.",
       "type": "object",
       "properties": {
-        "email": { "type": "string" }
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["owner", "admin"] },
+        "displayName": { "type": "string" },
+        "addedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["email"]
+      "required": ["uid", "email", "role"]
+    },
+    "Announcement": {
+      "title": "Dispatch",
+      "description": "System-wide archival updates and cultural broadcasts.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "warning", "achievement"] },
+        "date": { "type": "string", "format": "date-time" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["title", "content", "type"]
+    },
+    "Extension": {
+      "title": "Archival Plugin",
+      "description": "Modular extensions for the heritage system.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "apiKeyRequired": { "type": "boolean" },
+        "config": { "type": "object" }
+      },
+      "required": ["name", "status"]
+    },
+    "Integration": {
+      "title": "External API",
+      "description": "Connections to external cultural datasets or AI services.",
+      "type": "object",
+      "properties": {
+        "providerName": { "type": "string" },
+        "endpoint": { "type": "string" },
+        "lastSynced": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["connected", "disconnected"] }
+      },
+      "required": ["providerName", "endpoint", "status"]
     },
     "UserProfile": {
       "title": "User Profile",
@@ -52,6 +94,18 @@
     "/profiles/{userId}": {
       "schema": "UserProfile",
       "description": "Individual user profiles and settings."
+    },
+    "/announcements/{annId}": {
+      "schema": "Announcement",
+      "description": "Global archival dispatches."
+    },
+    "/extensions/{extId}": {
+      "schema": "Extension",
+      "description": "System plugins and modules."
+    },
+    "/integrations/{intId}": {
+      "schema": "Integration",
+      "description": "External API service configurations."
     }
   }
 }

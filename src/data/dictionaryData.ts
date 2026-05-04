@@ -2,7 +2,8 @@
 export interface DictionaryEntry {
   word: string;
   translation: string;
-  pronunciation: string;
+  phonetic: string;
+  ipa?: string;
   language: 'Acholi' | 'English';
   examples: { acholi: string; english: string }[];
 }
@@ -11,7 +12,8 @@ export const LOCAL_DICTIONARY: DictionaryEntry[] = [
   {
     word: 'Lyec',
     translation: 'Elephant',
-    pronunciation: 'Lyeh-ch',
+    phonetic: 'Lyeh-ch',
+    ipa: '/ljetʃ/',
     language: 'Acholi',
     examples: [
       { acholi: 'Lyec tye i lum.', english: 'The elephant is in the bush.' },
@@ -21,7 +23,8 @@ export const LOCAL_DICTIONARY: DictionaryEntry[] = [
   {
     word: 'Amot',
     translation: 'Greeting / I greet',
-    pronunciation: 'Ah-moht',
+    phonetic: 'Ah-moht',
+    ipa: '/aˈmot/',
     language: 'Acholi',
     examples: [
       { acholi: 'Amotwu ducu.', english: 'I greet you all.' }
@@ -30,7 +33,8 @@ export const LOCAL_DICTIONARY: DictionaryEntry[] = [
   {
     word: 'Kop ango',
     translation: 'How are you? / What is the news?',
-    pronunciation: 'Kohp ah-ngoh',
+    phonetic: 'Kohp ah-ngoh',
+    ipa: '/kop aŋgo/',
     language: 'Acholi',
     examples: [
       { acholi: 'Kop ango, lamin-na?', english: 'How are you, my sister?' }
@@ -39,7 +43,8 @@ export const LOCAL_DICTIONARY: DictionaryEntry[] = [
   {
     word: 'Kop pe',
     translation: 'I am fine / No news',
-    pronunciation: 'Kohp peh',
+    phonetic: 'Kohp peh',
+    ipa: '/kop pe/',
     language: 'Acholi',
     examples: [
       { acholi: 'Kop pe, tye maber.', english: 'I am fine, everything is good.' }
@@ -48,7 +53,8 @@ export const LOCAL_DICTIONARY: DictionaryEntry[] = [
   {
     word: 'Wot maber',
     translation: 'Safe journey',
-    pronunciation: 'Woht mah-behr',
+    phonetic: 'Woht mah-behr',
+    ipa: '/wot maˈber/',
     language: 'Acholi',
     examples: [
       { acholi: 'Wot maber i yo.', english: 'Have a safe journey on the road.' }
@@ -57,7 +63,8 @@ export const LOCAL_DICTIONARY: DictionaryEntry[] = [
   {
     word: 'Camat',
     translation: 'Food',
-    pronunciation: 'Chah-maht',
+    phonetic: 'Chah-maht',
+    ipa: '/caˈmat/',
     language: 'Acholi',
     examples: [
       { acholi: 'Camat tye maber.', english: 'The food is good.' }
@@ -66,7 +73,8 @@ export const LOCAL_DICTIONARY: DictionaryEntry[] = [
   {
     word: 'Dek',
     translation: 'Sauce / Stew',
-    pronunciation: 'Dehk',
+    phonetic: 'Dehk',
+    ipa: '/dek/',
     language: 'Acholi',
     examples: [
       { acholi: 'Dek malakwang mit.', english: 'Malakwang stew is delicious.' }

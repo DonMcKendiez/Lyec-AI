@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { History, Users, Landmark, Heart, Loader2, Sparkles, Quote, Volume2 } from 'lucide-react';
 import Logo from './Logo';
-import { fetchCulturalInsight, speakAcholi } from '../lib/gemini';
+import { fetchCulturalInsight, speakLanguage } from '../lib/gemini';
 import { motion, AnimatePresence } from 'motion/react';
 import { playPCMAudio } from '../lib/audio';
+import { useAuth } from '../contexts/AuthContext';
 
 const CATEGORIES = [
   { id: 'traditions', title: 'Traditions', icon: <Landmark className="w-4 h-4" />, query: 'Marriage and traditional ceremonies' },
@@ -13,6 +14,7 @@ const CATEGORIES = [
 ];
 
 export default function Culture() {
+  const { profile } = useAuth();
   const [insight, setInsight] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [speaking, setSpeaking] = useState(false);
@@ -21,7 +23,7 @@ export default function Culture() {
     setLoading(true);
     setInsight(null);
     try {
-      const data = await fetchCulturalInsight(topic);
+      const data = await fetchCulturalInsight(topic, profile?.level || 1, profile?.ageMode || 'adult', profile?.targetLanguage || 'Acholi');
       setInsight(data);
     } catch (error) {
       console.error(error);
@@ -34,7 +36,7 @@ export default function Culture() {
     if (speaking) return;
     setSpeaking(true);
     try {
-      const base64 = await speakAcholi(text);
+      const base64 = await speakLanguage(text, profile?.targetLanguage || 'Acholi');
       if (base64) {
         await playPCMAudio(base64);
       }
@@ -125,7 +127,7 @@ export default function Culture() {
                  <Quote className="absolute top-4 left-4 w-12 h-12 text-white/5" />
                  <div className="absolute top-4 right-4">
                    <button 
-                     onClick={() => playAudio(insight.proverb.acholi)}
+                     onClick={() => playAudio(insight.proverb.local || insight.proverb.acholi)}
                      disabled={speaking}
                      className={`p-2 rounded-full border border-white/10 hover:border-brand-primary hover:text-brand-primary transition-all active:scale-[0.8] ${speaking ? 'text-brand-primary ring-4 ring-brand-primary/10 animate-pulse' : 'text-white/40'}`}
                    >
@@ -134,7 +136,7 @@ export default function Culture() {
                  </div>
                  <div className="relative z-10 text-center space-y-4">
                    <p className="text-xl font-black uppercase italic tracking-tight text-white/90">
-                     "{insight.proverb.acholi}"
+                     "{insight.proverb.local || insight.proverb.acholi}"
                    </p>
                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-primary italic">
                      {insight.proverb.english}
@@ -151,7 +153,7 @@ export default function Culture() {
           >
             <Landmark className="w-12 h-12 text-amber-200 mx-auto mb-4" />
             <h3 className="text-xl font-black text-brand-text uppercase tracking-tight mb-2">Explore Heritage</h3>
-            <p className="text-stone-400 font-medium text-sm">Select a category above to delve into the heart of Acholi culture.</p>
+            <p className="text-stone-400 font-medium text-sm">Select a category above to delve into the heart of {profile?.targetLanguage || 'Acholi'} culture.</p>
           </motion.div>
         )}
       </AnimatePresence>

@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
-import { BookOpen, MapPin, CheckCircle2, ChevronRight, Loader2, Trophy, ArrowRight, User, Volume2, XCircle } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { BookOpen, MapPin, CheckCircle2, ChevronRight, Loader2, Trophy, ArrowRight, User, Volume2, XCircle, Mic, Square, Activity, Sparkles } from 'lucide-react';
 import Logo from './Logo';
-import { generateLessonContent, speakAcholi } from '../lib/gemini';
+import { generateLessonContent, speakLanguage, evaluatePronunciation } from '../lib/gemini';
 import { motion, AnimatePresence } from 'motion/react';
 import { playPCMAudio } from '../lib/audio';
+import { useAuth } from '../contexts/AuthContext';
 
 interface LessonData {
   title: string;
-  phrases: Array<{ acholi: string; english: string; pronunciation: string }>;
+  phrases: Array<{ local: string; native: string; acholi?: string; english?: string; pronunciation: string }>;
   culturalTip: string;
   quiz: Array<{
     question: string;
@@ -25,6 +26,7 @@ const TOPICS = [
 ];
 
 export default function Practice() {
+  const { profile } = useAuth();
   const [lesson, setLesson] = useState<LessonData | null>(null);
   const [loading, setLoading] = useState(false);
   const [quizIndex, setQuizIndex] = useState(0);
@@ -33,6 +35,12 @@ export default function Practice() {
   const [score, setScore] = useState(0);
   const [finished, setFinished] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState<number | null>(null);
+  const [isRecording, setIsRecording] = useState<number | null>(null);
+  const [evaluating, setEvaluating] = useState<number | null>(null);
+  const [feedback, setFeedback] = useState<{ [key: number]: string }>({});
+  
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const startLesson = async (topic: string) => {
     setLoading(true);
@@ -40,8 +48,13 @@ export default function Practice() {
     setFinished(false);
     setScore(0);
     setQuizIndex(0);
+    setFeedback({});
     try {
-      const data = await generateLessonContent(topic);
+      const data = await generateLessonContent(
+        topic, 
+        profile?.targetLanguage || 'Acholi',
+        profile?.nativeLanguage || 'English'
+      );
       setLesson(data);
     } catch (error) {
       console.error(error);
@@ -54,7 +67,7 @@ export default function Practice() {
     if (isSpeaking !== null) return;
     setIsSpeaking(index);
     try {
-      const base64 = await speakAcholi(text);
+      const base64 = await speakLanguage(text, profile?.targetLanguage || 'Acholi');
       if (base64) {
         await playPCMAudio(base64);
       }
@@ -62,6 +75,60 @@ export default function Practice() {
       console.error(error);
     } finally {
       setIsSpeaking(null);
+    }
+  };
+
+  const startRecording = async (index: number) => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType });
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const base64 = (reader.result as string).split(',')[1];
+          await analyzePronunciation(index, { data: base64, mimeType: mediaRecorder.mimeType });
+        };
+        reader.readAsDataURL(audioBlob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(index);
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording !== null) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(null);
+    }
+  };
+
+  const analyzePronunciation = async (index: number, audio: { data: string; mimeType: string }) => {
+    if (!lesson) return;
+    setEvaluating(index);
+    try {
+      const result = await evaluatePronunciation(
+        lesson.phrases[index].local || (lesson.phrases[index] as any).acholi, 
+        audio,
+        profile?.level || 1,
+        profile?.targetLanguage || 'Acholi'
+      );
+      setFeedback(prev => ({ ...prev, [index]: result }));
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setEvaluating(null);
     }
   };
 
@@ -147,21 +214,51 @@ export default function Practice() {
                 <div key={i} className="group border-b border-stone-100 last:border-0 pb-6">
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-2">
-                       <h3 className="text-2xl font-display italic font-black text-brand-primary leading-none uppercase">{p.acholi}</h3>
-                       <p className="text-lg font-medium text-stone-400 italic">“{p.english}”</p>
+                       <h3 className="text-2xl font-display italic font-black text-brand-primary leading-none uppercase">{p.local || (p as any).acholi}</h3>
+                       <p className="text-lg font-medium text-stone-400 italic">“{p.native || (p as any).english}”</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="hidden md:block font-mono text-[10px] font-bold text-stone-200 tracking-[0.2em] uppercase">[{p.pronunciation}]</span>
-                      <button
-                        onClick={() => handlePhrasePlay(p.acholi, i)}
-                        className={`p-4 bg-white border border-stone-100 rounded-full shadow-sm hover:shadow-lg hover:border-brand-primary hover:text-brand-primary transition-all active:scale-90 ${
-                          isSpeaking === i ? 'text-brand-primary ring-4 ring-brand-primary/10' : 'text-stone-300'
-                        }`}
-                      >
-                        <Volume2 className="w-5 h-5" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handlePhrasePlay(p.local || (p as any).acholi, i)}
+                          className={`p-4 bg-white border border-stone-100 rounded-full shadow-sm hover:shadow-lg hover:border-brand-primary hover:text-brand-primary transition-all active:scale-90 ${
+                            isSpeaking === i ? 'text-brand-primary ring-4 ring-brand-primary/10' : 'text-stone-300'
+                          }`}
+                          title="Listen"
+                        >
+                          <Volume2 className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => isRecording === i ? stopRecording() : startRecording(i)}
+                          className={`p-4 rounded-full border transition-all active:scale-90 ${
+                            isRecording === i 
+                              ? 'bg-red-500 text-white animate-pulse shadow-lg' 
+                              : evaluating === i
+                              ? 'bg-stone-50 text-stone-400 animate-spin'
+                              : 'bg-white border-stone-100 text-stone-300 hover:text-brand-primary hover:border-brand-primary'
+                          }`}
+                          title="Record for feedback"
+                        >
+                          {evaluating === i ? <Activity className="w-5 h-5" /> : isRecording ===i ? <Square className="w-5 h-5 fill-current" /> : <Mic className="w-5 h-5" />}
+                        </button>
+                      </div>
                     </div>
                   </div>
+                  <AnimatePresence>
+                    {feedback[i] && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        className="mt-4 p-4 bg-brand-primary/5 rounded-2xl border border-brand-primary/10 flex items-start gap-3"
+                      >
+                         <Sparkles className="w-4 h-4 text-brand-primary shrink-0 mt-0.5" />
+                         <p className="text-xs font-medium text-brand-text/70 italic leading-relaxed">
+                           {feedback[i]}
+                         </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               ))}
             </div>

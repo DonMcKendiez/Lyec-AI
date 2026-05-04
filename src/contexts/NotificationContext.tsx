@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Bell, CheckCircle, AlertCircle, X } from 'lucide-react';
 
+import { sendLocalNotification } from '../services/notificationService';
+
 interface Notification {
   id: string;
   title: string;
@@ -10,7 +12,7 @@ interface Notification {
 }
 
 interface NotificationContextType {
-  notify: (title: string, message: string, type?: 'info' | 'success' | 'warning') => void;
+  notify: (title: string, message: string, type?: 'info' | 'success' | 'warning', system?: boolean) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -18,9 +20,14 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  const notify = useCallback((title: string, message: string, type: 'info' | 'success' | 'warning' = 'info') => {
+  const notify = useCallback((title: string, message: string, type: 'info' | 'success' | 'warning' = 'info', system: boolean = false) => {
     const id = Math.random().toString(36).substring(7);
     setNotifications(prev => [...prev, { id, title, message, type }]);
+    
+    if (system) {
+      sendLocalNotification(title, { body: message });
+    }
+
     setTimeout(() => {
       setNotifications(prev => prev.filter(n => n.id !== id));
     }, 5000);
