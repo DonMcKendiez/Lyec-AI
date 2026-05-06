@@ -290,11 +290,24 @@ export async function evaluatePronunciation(targetPhrase: string, audioData: { d
       - Consonant clarity unique to ${targetLang}.
       - Vowel length and phonetic accuracy.
       
-      BE DIRECT AND CONCISE. Give a score out of 10.` }, { inlineData: audioData }] }
-    ]
+      Return a JSON response with 'accuracy' (number 0-100) and 'feedback' (string).` }, { inlineData: audioData }] }
+    ],
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          accuracy: { type: Type.NUMBER },
+          feedback: { type: Type.STRING }
+        },
+        required: ["accuracy", "feedback"]
+      }
+    }
   });
 
-  return response.text?.trim() || "Unable to evaluate at this time.";
+  const text = response.text;
+  if (!text) return { accuracy: 0, feedback: "Unable to evaluate at this time." };
+  return JSON.parse(text);
 }
 
 export async function runLanguageTask(prompt: string, audioData?: { data: string; mimeType: string }, userLevel: number = 1, ageMode: string = 'adult', history: ChatMessage[] = [], targetLang: string = 'Acholi', nativeLang: string = 'English') {

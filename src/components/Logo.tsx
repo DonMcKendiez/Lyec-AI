@@ -3,58 +3,43 @@ import React from 'react';
 interface LogoProps {
   className?: string;
   size?: number;
+  invert?: boolean;
 }
 
-export default function Logo({ className = '', size = 48 }: LogoProps) {
+export default function Logo({ className = '', size = 48, invert = false }: LogoProps) {
   return (
     <div className={`relative flex items-center justify-center ${className}`} style={{ width: size, height: size }}>
       <svg
         viewBox="0 0 100 100"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        className="w-full h-full drop-shadow-xl"
+        className="w-full h-full drop-shadow-2xl"
       >
-        {/* Modern Geometric Elephant Pictorial */}
+        {/* Minimalist Ancestral Icon - Geometric Shield/Mask */}
         <path
-          d="M15 45C15 30 25 20 50 20C75 20 85 30 85 45C85 60 75 70 50 70C25 70 15 60 15 45Z"
+          d="M50 10L85 30V70L50 90L15 70V30L50 10Z"
+          stroke="currentColor"
+          strokeWidth="4"
+          className={invert ? "text-white" : "text-brand-primary"}
+        />
+        <path
+          d="M50 25C60 25 65 30 65 40V60C65 70 60 75 50 75C40 75 35 70 35 60V40C35 30 40 25 50 25Z"
           fill="currentColor"
-          className="text-brand-primary"
-        />
-        {/* Large Ears / Sound waves */}
-        <path
-          d="M15 45C5 45 0 35 5 25C10 15 15 15 15 15"
-          stroke="currentColor"
-          strokeWidth="4"
-          strokeLinecap="round"
-          className="text-brand-primary/40"
+          className={invert ? "text-white/20" : "text-brand-primary/10"}
         />
         <path
-          d="M85 45C95 45 100 35 95 25C90 15 85 15 85 15"
-          stroke="currentColor"
-          strokeWidth="4"
-          strokeLinecap="round"
-          className="text-brand-primary/40"
-        />
-        {/* Digital Core eye */}
-        <circle cx="35" cy="40" r="3" fill="white" />
-        <circle cx="65" cy="40" r="3" fill="white" />
-        
-        {/* Symbolic Trunk / Tech Line */}
-        <path
-          d="M50 70V82C50 88 55 90 60 90"
+          d="M50 35V65M40 50H60"
           stroke="currentColor"
           strokeWidth="6"
           strokeLinecap="round"
-          className="text-brand-primary"
+          className={invert ? "text-white" : "text-brand-primary"}
         />
-        
-        {/* Circuit Pattern inside body */}
         <path
-          d="M30 55H70M40 48H60"
-          stroke="white"
-          strokeOpacity="0.3"
+          d="M15 30L50 50L85 30"
+          stroke="currentColor"
           strokeWidth="2"
-          strokeLinecap="round"
+          strokeOpacity="0.2"
+          className={invert ? "text-white" : "text-brand-primary"}
         />
       </svg>
     </div>

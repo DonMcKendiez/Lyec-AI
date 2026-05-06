@@ -7,7 +7,10 @@ import {
   doc, 
   query, 
   orderBy,
+  limit,
   serverTimestamp,
+  startAfter,
+  QueryDocumentSnapshot,
   onSnapshot
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -77,20 +80,30 @@ export function subscribeShowcaseItems(callback: (items: ShowcaseItem[]) => void
   });
 }
 
-export async function getShowcaseItems(): Promise<ShowcaseItem[]> {
+export async function getShowcaseItems(pageSize: number = 6, lastVisibleDoc?: QueryDocumentSnapshot): Promise<{ items: ShowcaseItem[], lastVisible: QueryDocumentSnapshot | null }> {
   try {
-    const q = query(collection(db, COLLECTION_PATH), orderBy('createdAt', 'desc'));
+    const collectionRef = collection(db, COLLECTION_PATH);
+    let q = query(collectionRef, orderBy('createdAt', 'desc'), limit(pageSize));
+    
+    if (lastVisibleDoc) {
+      q = query(collectionRef, orderBy('createdAt', 'desc'), startAfter(lastVisibleDoc), limit(pageSize));
+    }
+    
     const snapshot = await getDocs(q);
     const firestoreItems = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     } as ShowcaseItem));
-    return [...firestoreItems, ...INITIAL_ITEMS];
+    
+    return {
+      items: firestoreItems,
+      lastVisible: snapshot.docs[snapshot.docs.length - 1] || null
+    };
   } catch (error) {
     if (error instanceof Error && error.message.includes('permission')) {
        handleFirestoreError(error, OperationType.LIST, COLLECTION_PATH);
     }
-    return INITIAL_ITEMS;
+    return { items: INITIAL_ITEMS, lastVisible: null };
   }
 }
 

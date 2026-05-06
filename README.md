@@ -1,20 +1,44 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Wang Pa: The Ancestral Archive & Language Laboratory
 
-# Run and deploy your AI Studio app
+**Wang Pa** (Acholi for "The Heritage Spot") is a high-fidelity language learning and cultural preservation application dedicated to the Luo dialects, beginning with the **Acholi** language of Northern Uganda.
 
-This contains everything you need to run your app locally.
+Built for the next generation of digital archivists, Wang Pa bridges the gap between traditional wisdom and modern linguistic fluency using cutting-edge neural interfaces and interactive pedagogical systems.
 
-View your app in AI Studio: https://ai.studio/apps/d8f80c3d-9f49-4302-98a9-2d98bd5c527e
+## 🏺 Core Systems
 
-## Run Locally
+### 🎙️ Neural Guide Link
+Live, high-fidelity interaction with AI-powered ancestral guides modeled after esteemed community figures.
+- **Mzee Okot**: Deep historical context and clan wisdom.
+- **Acan**: Precision tonal guidance and linguistic expertise.
+- **Adaptive Pedagogy**: The system dynamically scales linguistic complexity based on the archivist's current proficiency level.
 
-**Prerequisites:**  Node.js
+### 🏋️ The Mental Fortress
+An interactive drill environment designed to sharpen linguistic reflexes and structural comprehension.
+- **Syntactic Puzzles**: Interactive drag-and-drop mechanics to master the sophisticated syntax of Luo dialects.
+- **Harmonic Alignment**: Real-time pronunciation analysis with instant feedback on tonal accuracy and phonetic clarity.
 
+### 🖼️ Heritage Scanner
+A visual archival tool for identifying and understanding material culture.
+- **Artifact Analysis**: Identify traditional tools, culinary heritage (e.g., *Kado Malakwang*), and cultural regalia through computer vision.
+- **Archival Wisdom**: A curated stream of proverbs (*Luo Proverb of the Day*) and folklore.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### 👤 Archivist Profile
+A comprehensive telemetry dashboard tracking your linguistic journey.
+- **Mastery Metrics**: Progress visualization across Vocabulary, Grammar, Pronunciation, and Cultural Insight.
+- **Fluency Tiers**: Evolution from *Seedling* to *Harvesting* stages.
+
+## 🛠️ The Architecture
+
+Wang Pa is built on a modern, distributed stack designed for performance and cultural precision:
+
+- **Interface**: React 18, TypeScript, Tailwind CSS
+- **Motion System**: Framer Motion for high-fidelity transitions
+- **Neural Engine**: Advanced Large Language Models for cultural and tonal reasoning
+- **Secure Archive**: Real-time cloud synchronization for personal progress and archival history
+
+## 🚀 Vision
+
+Wang Pa is more than a language application; it is a digital sanctuary for linguistic heritage. Our mission is to ensure that the tonal beauty and cultural depth of African languages are not only preserved but celebrated and made accessible to the global diaspora and local youth in the digital age.
+
+---
+*Developed with profound respect for the traditions and elders of the Acholi people.*

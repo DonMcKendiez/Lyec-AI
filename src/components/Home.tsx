@@ -1,15 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Utensils, Construction, Tent, ArrowRight, Loader2, X, BookOpen, Coffee, Music, Volume2, Sparkles, Camera } from 'lucide-react';
 import { generateCulturalPost, speakLanguage } from '../lib/gemini';
-import { getShowcaseItems, subscribeShowcaseItems, ShowcaseItem } from '../services/showcaseService';
+import { getShowcaseItems, ShowcaseItem } from '../services/showcaseService';
 import { motion, AnimatePresence } from 'motion/react';
+import { QueryDocumentSnapshot } from 'firebase/firestore';
 import ReactMarkdown from 'react-markdown';
 import { playPCMAudio } from '../lib/audio';
 import { useAuth } from '../contexts/AuthContext';
+import Logo from './Logo';
 
 export default function Home({ onNavigate }: { onNavigate?: (tab: any) => void }) {
   const { profile } = useAuth();
   const [items, setItems] = useState<ShowcaseItem[]>([]);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
+  const [hasMore, setHasMore] = useState(true);
   const [activeFilter, setActiveFilter] = useState('all');
   const [selectedItem, setSelectedItem] = useState<ShowcaseItem | null>(null);
   const [postContent, setPostContent] = useState('');
@@ -19,15 +23,13 @@ export default function Home({ onNavigate }: { onNavigate?: (tab: any) => void }
   const loaderRef = useRef<HTMLDivElement>(null);
 
   const loadMoreItems = async () => {
-    if (loadingItems) return;
+    if (loadingItems || !hasMore) return;
     setLoadingItems(true);
     try {
-      // For now, we simulate finding more items if they are not enough in the static list
-      // In a real app, this would fetch from Firestore with pagination
-      const currentItems = await getShowcaseItems();
-      // To simulate infinite, we just keep adding them (shuffled or rotated)
-      const rotated = [...currentItems].sort(() => Math.random() - 0.5);
-      setItems(prev => [...prev, ...rotated]);
+      const result = await getShowcaseItems(6, lastDoc || undefined);
+      if (result.items.length < 6) setHasMore(false);
+      setItems(prev => [...prev, ...result.items]);
+      setLastDoc(result.lastVisible);
     } catch (error) {
       console.error(error);
     } finally {
@@ -90,31 +92,34 @@ export default function Home({ onNavigate }: { onNavigate?: (tab: any) => void }
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto p-4 space-y-12">
+    <div className="w-full max-w-5xl mx-auto p-4 space-y-8">
       {/* Hero Section */}
-      <section className="text-center space-y-4 py-12 md:py-20 relative overflow-hidden px-4">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_50%_-20%,rgba(242,125,38,0.15)_0%,transparent_70%)] pointer-events-none" />
+      <section className="text-center space-y-3 py-8 md:py-12 relative overflow-hidden px-4">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_50%_-20%,rgba(242,125,38,0.1)_0%,transparent_70%)] pointer-events-none" />
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="space-y-4 relative z-10"
+          className="space-y-3 relative z-10"
         >
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white shadow-sm rounded-full border border-stone-100 text-[8px] font-black uppercase tracking-[0.4em] text-brand-primary mb-2">
-             <Sparkles className="w-3 h-3" />
-             Archival Heritage
+          <div className="flex justify-center mb-4">
+            <Logo size={100} />
           </div>
-          <h1 className="text-5xl md:text-8xl font-display italic font-black text-brand-text tracking-tighter leading-[0.85]">
-            The <span className="text-brand-primary">Luo</span> <br />
-            Legacy <span className="text-stone-300 underline decoration-brand-accent/30 decoration-8 underline-offset-4">Vault</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white shadow-sm rounded-full border border-stone-100 text-[8px] font-black uppercase tracking-[0.4em] text-brand-primary mb-1">
+             <Sparkles className="w-3 h-3" />
+             Archival Heritage · v1.0.0
+          </div>
+          <h1 className="text-4xl md:text-7xl font-display italic font-black text-brand-text tracking-tighter leading-[0.85]">
+            Wang <span className="text-brand-primary">Pa</span> <br />
+            Ancestral <span className="text-stone-300 underline decoration-brand-accent/30 decoration-8 underline-offset-4">Archive</span>
           </h1>
-          <p className="max-w-xl mx-auto text-stone-400 font-medium text-sm md:text-lg leading-relaxed pt-2">
-            Preserving the collective memory of the Acholi people. Discover oral traditions, crafts, and ancestral knowledge.
+          <p className="max-w-md mx-auto text-stone-400 font-medium text-[13px] md:text-base leading-relaxed pt-1">
+            Wang Pa is high-fidelity portal dedicated to preserving the tonal beauty and cultural depth of the Acholi people. Bridging ancient wisdom with neural technology.
           </p>
         </motion.div>
       </section>
 
       {/* Heritage Feed / Spotlight */}
-      <section className="space-y-6">
+      <motion.section 
+        className="space-y-6"
+      >
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between px-2">
             <h2 className="text-xl font-display italic font-black text-brand-text">Heritage Collections</h2>
@@ -139,11 +144,10 @@ export default function Home({ onNavigate }: { onNavigate?: (tab: any) => void }
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 px-2 pb-12">
-          {loadingItems ? (
-            <div className="col-span-full h-64 flex flex-col items-center justify-center gap-4">
-              <Loader2 className="w-12 h-12 text-brand-primary animate-spin" />
-              <p className="font-black text-xs uppercase tracking-widest text-brand-text/40">Synchronizing Archive...</p>
-            </div>
+          {items.length === 0 && loadingItems ? (
+             Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="aspect-[4/5] bg-stone-50 rounded-[2.5rem] animate-pulse" />
+             ))
           ) : items.length === 0 ? (
              <div className="col-span-full py-20 text-center space-y-4">
                 <div className="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center mx-auto text-stone-300">
@@ -176,10 +180,11 @@ export default function Home({ onNavigate }: { onNavigate?: (tab: any) => void }
         </div>
         
         <div ref={loaderRef} className="py-20 flex flex-col items-center justify-center gap-4">
-          <Loader2 className="w-10 h-10 text-stone-200 animate-spin" />
-          <p className="text-[9px] font-black text-stone-300 uppercase tracking-[0.4em]">Deciphering more artifacts...</p>
+          {hasMore && (
+            <Loader2 className="w-6 h-6 text-stone-100 animate-spin" />
+          )}
         </div>
-      </section>
+      </motion.section>
 
       {/* Modal / Post Detail */}
       <AnimatePresence>

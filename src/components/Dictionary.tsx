@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Volume2, Loader2, Book, ArrowRightLeft, Sparkles, WifiOff, Mic, Square, Trash2, History, Languages } from 'lucide-react';
+import { Search, Volume2, Loader2, Book, ArrowRightLeft, Sparkles, WifiOff, Mic, Square, Trash2, History, Languages, Camera } from 'lucide-react';
 import { lookupInDictionary, speakLanguage } from '../lib/gemini';
 import { motion, AnimatePresence } from 'motion/react';
 import { playPCMAudio } from '../lib/audio';
@@ -165,33 +165,50 @@ export default function Dictionary() {
       </div>
 
       <div className="interactive-card p-6 md:p-8 space-y-6">
-        <form onSubmit={handleSearch} className="relative group">
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search the archives..."
-            className="w-full pl-12 pr-12 py-6 bg-stone-50 border-2 border-brand-border rounded-[1.5rem] focus:border-brand-primary focus:bg-white outline-none transition-all font-display italic text-lg font-medium text-brand-text"
-          />
-          <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-300 group-focus-within:text-brand-primary transition-colors" />
-          
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+        <div className="space-y-4">
+          <form onSubmit={handleSearch} className="relative group">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search the archives..."
+              className="w-full pl-12 pr-6 py-6 bg-stone-50 border-2 border-brand-border rounded-[1.5rem] focus:border-brand-primary focus:bg-white outline-none transition-all font-display italic text-lg font-medium text-brand-text"
+            />
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-300 group-focus-within:text-brand-primary transition-colors" />
+          </form>
+
+          <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={toggleListening}
-              className={`p-3 rounded-xl transition-all active:scale-90 ${isListening ? 'bg-red-500 text-white animate-pulse shadow-lg ring-4 ring-red-500/20' : 'text-stone-300 hover:text-brand-primary'}`}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl transition-all active:scale-95 border ${
+                isListening 
+                  ? 'bg-red-500 text-white border-red-400 animate-pulse shadow-lg ring-4 ring-red-500/10' 
+                  : 'bg-white text-stone-500 border-stone-100 hover:border-brand-primary hover:text-brand-primary'
+              }`}
             >
               {isListening ? <Square className="w-4 h-4 fill-current" /> : <Mic className="w-4 h-4" />}
+              <span className="text-[10px] font-black uppercase tracking-widest">Voice Search</span>
             </button>
+
             <button
-              type="submit"
-              disabled={loading || !searchTerm.trim()}
-              className="px-6 py-3 bg-brand-primary text-white rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-brand-primary-hover active:scale-95 disabled:opacity-50 transition-all shadow-lg shadow-brand-primary/20"
+              type="button"
+              className="flex-1 flex items-center justify-center gap-2 py-3 bg-white text-stone-500 border border-stone-100 rounded-2xl hover:border-brand-primary hover:text-brand-primary transition-all active:scale-95"
+              title="Visual Search"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
+              <Camera className="w-4 h-4" />
+              <span className="text-[10px] font-black uppercase tracking-widest">Record Search</span>
+            </button>
+
+            <button
+              onClick={handleSearch}
+              disabled={loading || !searchTerm.trim()}
+              className="flex-[1.5] py-3 bg-brand-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-primary-hover active:scale-95 disabled:opacity-50 transition-all shadow-lg shadow-brand-primary/20 flex items-center justify-center gap-2"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Search className="w-3.5 h-3.5" /> Execute Queries</>}
             </button>
           </div>
-        </form>
+        </div>
 
         {/* Recent Searches */}
         {recentSearches.length > 0 && (

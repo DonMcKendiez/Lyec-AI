@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Languages, MessageSquareCode, GraduationCap, Heart, Landmark, Sparkles, Home as HomeIcon, Book, Camera, LogOut, LayoutGrid, Settings as SettingsIcon } from 'lucide-react';
+import { Languages, MessageSquareCode, GraduationCap, Heart, Landmark, Sparkles, Home as HomeIcon, Book, Camera, LogOut, LayoutGrid, Settings as SettingsIcon, User, ChevronRight, Menu, ChevronUp } from 'lucide-react';
 import Home from './components/Home';
 import Translator from './components/Translator';
 import ChatTutor from './components/ChatTutor';
@@ -52,37 +52,10 @@ function AppContent() {
   const { user, profile, isAdmin, loading, signOut } = useAuth();
   const { notify } = useNotification();
 
-  // Reset bars on tab change
+  // Reset scroll on tab change
   useEffect(() => {
-    setShowBars(true);
     if (mainScrollRef.current) mainScrollRef.current.scrollTop = 0;
   }, [activeTab]);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const container = mainScrollRef.current;
-      if (!container) return;
-      
-      const currentScrollY = container.scrollTop;
-      const velocity = currentScrollY - lastScrollY;
-      const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 100;
-
-      if (velocity > 10 && currentScrollY > 80 && !isAtBottom) {
-        setShowBars(false);
-        setIsScrollingUp(false);
-      } else if (velocity < -20 || isAtBottom || currentScrollY < 20) {
-        setShowBars(true);
-        setIsScrollingUp(true);
-      }
-      setLastScrollY(currentScrollY);
-    };
-
-    const container = mainScrollRef.current;
-    if (container) {
-      container.addEventListener('scroll', handleScroll, { passive: true });
-    }
-    return () => container?.removeEventListener('scroll', handleScroll);
-  }, [lastScrollY]);
 
   useEffect(() => {
     // Validate Connection to Firestore
@@ -126,13 +99,6 @@ function AppContent() {
       }
     }, 10000);
 
-    // Mock background activity
-    const postInterval = setInterval(() => {
-      if (Math.random() < 0.05) {
-        notify("Archive Update", "New cultural artifacts have been cataloged in the heritage feed.", "success", true);
-      }
-    }, 60000);
-
     // Online Status
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
@@ -141,7 +107,6 @@ function AppContent() {
 
     return () => {
       clearInterval(reminderInterval);
-      clearInterval(postInterval);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
@@ -202,54 +167,79 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-brand-bg selection:bg-brand-primary selection:text-white overflow-hidden">
-      {/* App Shell Header */}
+    <div className="min-h-screen flex flex-col bg-brand-bg selection:bg-brand-primary selection:text-white overflow-hidden relative">
+      {/* App Shell Header - Play Store Style Pill */}
       <motion.header 
         animate={{ 
-          y: showBars ? 0 : -80,
-          opacity: showBars ? 1 : 0
+          y: showBars ? 16 : -120,
+          opacity: showBars ? 1 : 0,
+          scale: showBars ? 1 : 0.95
         }}
-        transition={{ type: "spring", damping: 30, stiffness: 250 }}
-        className="fixed top-0 inset-x-0 z-40 bg-white/90 backdrop-blur-2xl border-b border-stone-100 px-6 h-20 flex items-center justify-between shadow-sm"
+        transition={{ 
+          type: "spring", 
+          damping: 30, 
+          stiffness: 220,
+          opacity: { duration: 0.2 }
+        }}
+        className="fixed top-0 inset-x-4 md:inset-x-6 z-40 bg-white/95 backdrop-blur-2xl border border-stone-100 px-4 md:px-6 h-14 md:h-16 flex items-center justify-between shadow-lg rounded-[2.5rem]"
+        onClick={() => setShowBars(false)}
       >
-        <div className="flex items-center gap-4">
-          <button onClick={() => setActiveTab('home')} className="flex items-center gap-3 active:scale-95 transition-all">
-            <div className="p-2.5 bg-brand-primary/5 rounded-2xl border border-brand-primary/10 shadow-inner">
-              <Logo size={36} />
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveTab('home');
+              setShowBars(false);
+            }} 
+            className="flex items-center gap-2.5 active:scale-95 transition-all"
+          >
+            <div className="p-1.5 bg-brand-primary/5 rounded-lg border border-brand-primary/10">
+              <Logo size={22} />
             </div>
             <div className="flex flex-col -space-y-0.5 text-left">
-              <span className="text-lg font-black text-brand-text tracking-tighter uppercase italic leading-none">Lyec<span className="text-brand-primary">AI</span></span>
-              <span className="text-[8px] font-black uppercase tracking-[0.3em] text-stone-400">Acholi Heritage</span>
+              <span className="text-xs font-black text-brand-text uppercase italic tracking-tighter leading-none">Wang<span className="text-brand-primary">Pa</span></span>
+              <span className="text-[6px] font-black uppercase tracking-[0.2em] text-stone-300">The Heritage Spot</span>
             </div>
           </button>
         </div>
-
-        <div className="flex items-center gap-3">
+        
+        <div className="flex items-center gap-2">
           {user ? (
             <button 
-              onClick={() => setActiveTab('settings')}
-              className="group flex items-center gap-2 p-1 pr-3 bg-stone-50 border border-stone-100 rounded-2xl active:scale-95 transition-all shadow-sm hover:border-brand-primary/30"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveTab('settings');
+                setShowBars(false);
+              }}
+              className="group flex items-center gap-2 p-0.5 pr-2.5 bg-stone-50 border border-stone-100 rounded-full active:scale-95 transition-all hover:border-brand-primary/30"
             >
-              <div className="w-8 h-8 rounded-xl bg-white border border-stone-100 flex items-center justify-center overflow-hidden transition-all group-hover:shadow-md">
+              <div className="w-7 h-7 rounded-full bg-white border border-stone-100 flex items-center justify-center overflow-hidden transition-all group-hover:shadow-sm">
                 {user.photoURL ? (
                   <img src={user.photoURL} alt="" className="w-full h-full object-cover" />
                 ) : (
-                  <span className="text-[10px] font-black text-brand-text">{user.email?.charAt(0).toUpperCase()}</span>
+                  <User size={14} className="text-stone-300" />
                 )}
               </div>
-              <div className="flex flex-col items-start">
-                <span className="text-[8px] font-black text-stone-400 uppercase tracking-widest leading-none">Archivist</span>
-                <span className="text-[10px] font-bold text-brand-text leading-none mt-1 truncate max-w-[80px]">
+              <div className="text-left hidden xs:block">
+                <span className="block text-[7px] font-black text-brand-text uppercase tracking-widest leading-none truncate max-w-[60px]">
                   {user.displayName || user.email?.split('@')[0]}
                 </span>
+                <div className="flex items-center gap-1 mt-0.5">
+                   <div className="w-1 h-1 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" />
+                   <p className="text-[6px] font-bold text-stone-400 uppercase tracking-tighter">LVL {profile?.level || 1}</p>
+                </div>
               </div>
             </button>
           ) : (
             <button 
-              onClick={() => setActiveTab('auth')}
-              className="px-4 py-2 bg-brand-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg hover:shadow-brand-primary/20 active:scale-95 transition-all"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveTab('settings');
+                setShowBars(false);
+              }}
+              className="px-4 py-1.5 bg-brand-primary text-white rounded-full text-[9px] font-black uppercase tracking-widest hover:scale-105 transition-all active:scale-95"
             >
-              Sign In
+              Auth
             </button>
           )}
         </div>
@@ -258,54 +248,37 @@ function AppContent() {
       {/* Viewport Content */}
       <main 
         ref={mainScrollRef as any}
-        className="flex-1 relative overflow-y-auto no-scrollbar pt-16 pb-32"
+        className="flex-1 relative overflow-y-auto custom-scrollbar pt-14 pb-28"
       >
-        <AnimatePresence>
-          {updateInfo?.available && (
-            <motion.div 
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="bg-brand-primary text-white px-6 py-4 flex items-center justify-between shadow-lg overflow-hidden"
+        <div className="max-w-7xl mx-auto w-full h-full">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -5 }}
+              transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+              className="w-full h-full"
             >
-              <div className="flex items-center gap-3">
-                 <div className="p-2 bg-white/20 rounded-xl">
-                   <SparklesIcon className="w-4 h-4" />
-                 </div>
-                 <div className="flex flex-col">
-                    <span className="text-[10px] font-black uppercase tracking-widest leading-none">Update Available: v{updateInfo.version}</span>
-                    <span className="text-[8px] font-medium opacity-80 mt-0.5">Enhance your heritage archiving experience.</span>
+              {renderContent()}
+              
+              {/* AI Disclaimer - Gemini Style */}
+              <div className="px-6 py-8 text-center">
+                 <p className="text-[9px] font-medium text-stone-400 uppercase tracking-widest leading-loose max-w-[280px] mx-auto opacity-40">
+                   Wang Pa AI may display inaccurate cultural info. Consult elders for critical heritage data.
+                 </p>
+                 <div className="mt-2 flex items-center justify-center gap-3 text-stone-300">
+                    <span className="w-6 h-[1px] bg-stone-50" />
+                    <Logo size={12} className="grayscale opacity-10" />
+                    <span className="w-6 h-[1px] bg-stone-50" />
                  </div>
               </div>
-              <button 
-                onClick={() => {
-                  acknowledgeUpdate(updateInfo.version);
-                  window.location.reload(); 
-                  setUpdateInfo(null);
-                }}
-                className="px-4 py-1.5 bg-white text-brand-primary rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-stone-50 active:scale-95 transition-all shadow-sm"
-              >
-                Update Now
-              </button>
             </motion.div>
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="w-full h-full"
-          >
-            {renderContent()}
-          </motion.div>
-        </AnimatePresence>
+          </AnimatePresence>
+        </div>
       </main>
 
-      {/* Apple-esque Mobile Bottom Navigation with Improved Drawer Handle */}
+      {/* App Shell Footer - Play Store Style Pill */}
       <motion.nav 
         drag="y"
         dragConstraints={{ top: 0, bottom: 0 }}
@@ -315,98 +288,90 @@ function AppContent() {
           if (info.offset.y > 30) setShowBars(false);
         }}
         animate={{ 
-          y: showBars ? 0 : 110,
-          scale: showBars ? 1 : 0.96,
-          opacity: showBars ? 1 : 0.85
+          y: showBars ? -16 : 140,
+          scale: showBars ? 1 : 0.94,
+          opacity: showBars ? 1 : 0
         }}
         transition={{ 
           type: "spring", 
-          damping: 32, 
-          stiffness: 280,
-          opacity: { duration: 0.2 }
+          damping: 40, 
+          stiffness: 220,
+          opacity: { duration: 0.4 }
         }}
-        className="fixed bottom-0 inset-x-0 z-50 bg-white/95 backdrop-blur-3xl border-t border-stone-100 flex items-end justify-around px-4 pb-safe-bottom h-20 md:h-28 shadow-[0_-12px_44px_rgba(0,0,0,0.06)]"
+        className="fixed bottom-0 inset-x-4 md:inset-x-6 z-50 bg-white/95 backdrop-blur-3xl border border-stone-100 flex items-center justify-around px-2 h-14 md:h-16 shadow-xl rounded-[2.5rem]"
+        onClick={() => setShowBars(false)}
       >
-        {/* Modern Drawer Handle Indicator */}
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-stone-100 rounded-full md:hidden cursor-grab active:cursor-grabbing hover:bg-stone-200 transition-colors" />
+        <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-8 h-1 bg-stone-100 rounded-full md:hidden" />
         
-        <AnimatePresence>
-          {!showBars && (
-             <motion.button 
-               initial={{ opacity: 0, y: 20, x: "-50%" }}
-               animate={{ opacity: 1, y: 0, x: "-50%" }}
-               exit={{ opacity: 0, y: 20, x: "-50%" }}
-               whileHover={{ scale: 1.1, y: -2 }}
-               whileTap={{ scale: 0.9 }}
-               onClick={() => setShowBars(true)}
-               className="absolute -top-16 left-1/2 w-14 h-14 bg-brand-primary text-white rounded-3xl flex items-center justify-center shadow-[0_12px_48px_rgba(242,125,38,0.4)] border-[6px] border-white active:scale-90 transition-all cursor-pointer z-50"
-             >
-               <LayoutGrid className="w-6 h-6" />
-               <motion.div 
-                 initial={{ opacity: 0, y: 10 }}
-                 animate={{ opacity: 1, y: -24 }}
-                 transition={{ delay: 0.5 }}
-                 className="absolute left-1/2 -translate-x-1/2 text-[9px] font-black uppercase tracking-[0.2em] text-brand-primary whitespace-nowrap bg-white/90 backdrop-blur-md px-3 py-1 rounded-full shadow-sm border border-brand-primary/10"
-               >
-                 Open Archive
-               </motion.div>
-               <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-4 h-1 bg-white/40 rounded-full animate-bounce" />
-             </motion.button>
-          )}
-        </AnimatePresence>
         {mainTabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowBars(false);
               if (tab.isMore) {
                 setShowMoreMenu(true);
               } else {
                 setActiveTab(tab.id as Tab);
               }
             }}
-            className={`relative flex flex-col items-center justify-center gap-1.5 min-w-[64px] h-full transition-all duration-500 ${
-              tab.primary ? 'pb-4' : 'pb-2'
+            className={`relative flex flex-col items-center justify-center gap-1 min-w-[56px] h-full transition-all duration-500 ${
+              tab.primary ? 'pb-3' : 'pb-1'
             }`}
           >
             {tab.primary ? (
               <div className="relative group">
-                <div className="absolute -inset-4 bg-brand-primary/20 rounded-full blur-2xl group-active:blur-lg transition-all" />
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500 shadow-xl ${
+                <div className="absolute -inset-3 bg-brand-primary/10 rounded-full blur-xl group-active:blur-lg transition-all" />
+                <div className={`w-12 h-12 rounded-[1.25rem] flex items-center justify-center transition-all duration-500 shadow-lg ${
                   activeTab === tab.id 
-                    ? 'bg-brand-primary text-white scale-110 -translate-y-6 rotate-0 shadow-brand-primary/40' 
-                    : 'bg-brand-text text-white -translate-y-4 hover:-translate-y-6'
+                    ? 'bg-brand-primary text-white scale-110 -translate-y-5 shadow-brand-primary/40' 
+                    : 'bg-brand-text text-white -translate-y-3 hover:-translate-y-5'
                 }`}>
                   {tab.icon}
                 </div>
               </div>
             ) : (
               <>
-                <div className={`p-2 rounded-xl transition-all duration-300 ${
+                <div className={`p-1.5 rounded-lg transition-all duration-300 ${
                   activeTab === tab.id || (tab.isMore && showMoreMenu)
                     ? 'text-brand-primary' 
                     : 'text-stone-400'
                 }`}>
                   {tab.icon}
                 </div>
-                <span className={`text-[9px] font-black uppercase tracking-[0.1em] transition-all duration-300 ${
+                <span className={`text-[8px] font-black uppercase tracking-[0.1em] transition-all duration-300 ${
                   activeTab === tab.id || (tab.isMore && showMoreMenu)
-                    ? 'text-brand-primary opacity-100 transform scale-110' 
-                    : 'text-stone-300 opacity-80'
+                    ? 'text-brand-primary opacity-100' 
+                    : 'text-stone-200 opacity-60'
                 }`}>
                   {tab.label}
                 </span>
-                {(activeTab === tab.id || (tab.isMore && showMoreMenu)) && !tab.primary && (
-                  <motion.div 
-                    layoutId="navIndicator" 
-                    className="absolute bottom-0 w-12 h-1 bg-brand-primary rounded-t-full" 
-                    transition={{ type: "spring", bounce: 0.3, duration: 0.6 }}
-                  />
-                )}
               </>
             )}
           </button>
         ))}
       </motion.nav>
+
+
+      {/* Global Draw Out Trigger Handle */}
+      <AnimatePresence>
+        {!showBars && (
+          <motion.button 
+            initial={{ y: 100, x: "-50%", opacity: 0 }}
+            animate={{ y: 0, x: "-50%", opacity: 1 }}
+            exit={{ y: 100, x: "-50%", opacity: 0 }}
+            whileHover={{ y: -2 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowBars(true)}
+            className="fixed bottom-3 left-1/2 z-[60] px-4 py-2 bg-brand-primary/80 backdrop-blur-md text-white rounded-full flex items-center gap-2 shadow-[0_8px_32px_rgba(242,125,38,0.3)] border border-white/20 transition-all font-black uppercase text-[8px] tracking-[0.2em] group"
+          >
+            <div className="w-4 h-4 bg-white/20 rounded-lg flex items-center justify-center">
+              <ChevronUp className="w-2.5 h-2.5 text-white" />
+            </div>
+            <span>Open Vault</span>
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       {/* "More" Sheet Overlay */}
       <AnimatePresence>

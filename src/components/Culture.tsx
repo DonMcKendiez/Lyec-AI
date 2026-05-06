@@ -5,6 +5,7 @@ import { fetchCulturalInsight, speakLanguage } from '../lib/gemini';
 import { motion, AnimatePresence } from 'motion/react';
 import { playPCMAudio } from '../lib/audio';
 import { useAuth } from '../contexts/AuthContext';
+import CultureMap from './CultureMap';
 
 const CATEGORIES = [
   { id: 'traditions', title: 'Traditions', icon: <Landmark className="w-4 h-4" />, query: 'Marriage and traditional ceremonies' },
@@ -49,6 +50,16 @@ export default function Culture() {
 
   return (
     <div className="w-full max-w-4xl mx-auto p-4 space-y-8">
+      <div className="space-y-4">
+        <header className="text-center space-y-2">
+          <h2 className="text-3xl font-display font-black text-brand-text uppercase italic tracking-tighter">
+            Territories of <span className="text-brand-primary">Acholi</span>
+          </h2>
+          <p className="text-xs text-stone-400 font-medium">The ancestral lands where our stories and traditions were born.</p>
+        </header>
+        <CultureMap />
+      </div>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {CATEGORIES.map((cat) => (
           <button

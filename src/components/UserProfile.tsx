@@ -14,11 +14,18 @@ import {
   AlertCircle,
   Smartphone,
   Lock,
-  LogOut
+  LogOut,
+  Trophy,
+  Activity,
+  Sparkles,
+  BookOpen,
+  Mic2,
+  GraduationCap
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import Logo from './Logo';
+import { AVATARS, LANGUAGES, PROFICIENCY_LEVELS } from '../constants';
 
 import { APP_VERSION } from '../services/notificationService';
 
@@ -93,8 +100,23 @@ export default function UserProfile({ onNavigate }: { onNavigate?: (tab: string)
   const handleUpdateLanguage = (type: 'native' | 'target', lang: string) => {
     if (updateProfile) {
       updateProfile({ [type === 'native' ? 'nativeLanguage' : 'targetLanguage']: lang });
+      notify("Language Set", `Your ${type} language is now ${lang}.`, "success");
     }
   };
+
+  const handleUpdateProficiency = (level: string) => {
+    if (updateProfile) {
+      updateProfile({ proficiency: level as any });
+      notify("Proficiency Updated", `Syncing curriculum with ${level} level.`, "info");
+    }
+  };
+
+  const masteryProgress = [
+    { label: 'Vocabulary', value: 65, icon: <BookOpen className="w-4 h-4" /> },
+    { label: 'Grammar', value: 42, icon: <SettingsIcon className="w-4 h-4" /> },
+    { label: 'Pronunciation', value: 88, icon: <Mic2 className="w-4 h-4" /> },
+    { label: 'Cultural Deep-Dive', value: 24, icon: <Sparkles className="w-4 h-4" /> },
+  ];
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4 pb-24 md:pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -161,6 +183,11 @@ export default function UserProfile({ onNavigate }: { onNavigate?: (tab: string)
                <span className="text-xs font-black italic">{profile?.xp || 0}</span>
                <span className="text-[10px] font-black uppercase tracking-widest text-white/60">XP</span>
             </div>
+            <div className="px-4 py-2 bg-brand-primary/10 rounded-2xl border border-brand-primary/20 flex items-center gap-3">
+               <span className="text-[10px] font-black uppercase tracking-widest text-brand-primary">
+                 {profile?.proficiency || 'beginner'}
+               </span>
+            </div>
           </div>
         </div>
         
@@ -173,59 +200,148 @@ export default function UserProfile({ onNavigate }: { onNavigate?: (tab: string)
         />
       </section>
 
-      {/* AI Persona Section */}
-      <section className="mb-8 p-8 bg-white rounded-[3rem] border border-stone-100 shadow-sm space-y-6">
+      {/* Mastery Progress Section */}
+      <section className="mb-8 p-8 bg-white rounded-[3rem] border border-stone-100 shadow-sm space-y-8">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-xl font-display italic font-black text-brand-text leading-none uppercase">AI Interaction Persona</h3>
-            <p className="text-[9px] font-black text-stone-400 uppercase tracking-widest mt-1">Customize How the Archive Speaks</p>
+            <h3 className="text-xl font-display italic font-black text-brand-text leading-none uppercase">Archival Mastery</h3>
+            <p className="text-[9px] font-black text-stone-400 uppercase tracking-widest mt-1">Real-time Linguistic Progress</p>
           </div>
-          <SettingsIcon className="w-5 h-5 text-stone-200" />
+          <Trophy className="w-5 h-5 text-brand-primary" />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+           {masteryProgress.map((stat, i) => (
+             <div key={i} className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-stone-400">
+                    {stat.icon}
+                    <span className="text-[10px] font-black uppercase tracking-widest">{stat.label}</span>
+                  </div>
+                  <span className="text-xs font-black italic text-brand-text">{stat.value}%</span>
+                </div>
+                <div className="h-2 bg-stone-50 rounded-full overflow-hidden border border-stone-100 p-0.5">
+                   <motion.div 
+                     initial={{ width: 0 }}
+                     animate={{ width: `${stat.value}%` }}
+                     className="h-full bg-brand-primary rounded-full shadow-[0_0_10px_rgba(242,125,38,0.4)]"
+                   />
+                </div>
+             </div>
+           ))}
+        </div>
+      </section>
+
+      {/* AI Tutor Persona & Guide Selection */}
+      <section className="mb-8 p-8 bg-white rounded-[3rem] border border-stone-100 shadow-sm space-y-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-display italic font-black text-brand-text leading-none uppercase">Neural Guide Link</h3>
+            <p className="text-[9px] font-black text-stone-400 uppercase tracking-widest mt-1">Select your primary ancestral interface</p>
+          </div>
+          <Sparkles className="w-5 h-5 text-brand-primary" />
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+           {AVATARS.map(avatar => (
+             <button
+               key={avatar.id}
+               onClick={() => updateProfile({ selectedAvatarId: avatar.id })}
+               className={`group relative aspect-[3/4] rounded-[2rem] overflow-hidden border-2 transition-all duration-500 ${
+                 profile?.selectedAvatarId === avatar.id 
+                  ? 'border-brand-primary ring-4 ring-brand-primary/10 scale-105 shadow-xl' 
+                  : 'border-transparent opacity-40 hover:opacity-100'
+               }`}
+             >
+               <img src={avatar.image} className="w-full h-full object-cover" alt="" />
+               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-4">
+                  <span className="text-[8px] font-black uppercase tracking-tight text-white">{avatar.name}</span>
+               </div>
+               {profile?.selectedAvatarId === avatar.id && (
+                 <div className="absolute top-2 right-2 w-5 h-5 bg-brand-primary rounded-full flex items-center justify-center shadow-lg">
+                    <CheckCircle2 className="w-3 h-3 text-white" />
+                 </div>
+               )}
+             </button>
+           ))}
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {personaOptions.map((opt) => (
-            <button
-              key={opt.id}
-              onClick={() => handlePersonaChange(opt.id)}
-              className={`p-4 rounded-2xl border-2 transition-all text-left space-y-1 ${
-                profile?.persona === opt.id 
-                  ? 'border-brand-primary bg-brand-primary/5' 
-                  : 'border-stone-50 bg-stone-50/50 hover:border-stone-200'
-              }`}
-            >
-              <div className={`text-[10px] font-black uppercase tracking-widest ${profile?.persona === opt.id ? 'text-brand-primary' : 'text-stone-400'}`}>
-                {opt.label}
-              </div>
-              <div className="text-[8px] font-medium text-stone-400 leading-tight">
-                {opt.description}
-              </div>
-            </button>
-          ))}
+        <div className="pt-4 border-t border-stone-50">
+          <label className="text-[10px] font-black uppercase tracking-widest text-stone-400 ml-2">Interaction Tone</label>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+            {personaOptions.map((opt) => (
+              <button
+                key={opt.id}
+                onClick={() => handlePersonaChange(opt.id)}
+                className={`p-4 rounded-2xl border-2 transition-all text-left space-y-1 ${
+                  profile?.persona === opt.id 
+                    ? 'border-brand-primary bg-brand-primary/5' 
+                    : 'border-stone-50 bg-stone-50/50 hover:border-stone-200'
+                }`}
+              >
+                <div className={`text-[10px] font-black uppercase tracking-widest ${profile?.persona === opt.id ? 'text-brand-primary' : 'text-stone-400'}`}>
+                  {opt.label}
+                </div>
+                <div className="text-[8px] font-medium text-stone-400 leading-tight">
+                  {opt.description}
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* Language Selection Section */}
-      <section className="mb-8 p-8 bg-white rounded-[3rem] border border-stone-100 shadow-sm space-y-6">
+      <section className="mb-8 p-8 bg-white rounded-[3rem] border border-stone-100 shadow-sm space-y-8">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-xl font-display italic font-black text-brand-text leading-none uppercase">Linguistic Settings</h3>
-            <p className="text-[9px] font-black text-stone-400 uppercase tracking-widest mt-1">Select your Native and Target languages</p>
+            <h3 className="text-xl font-display italic font-black text-brand-text leading-none uppercase">Heritage Stream</h3>
+            <p className="text-[9px] font-black text-stone-400 uppercase tracking-widest mt-1">Configure Linguistic Alignment</p>
           </div>
-          <Globe className="w-5 h-5 text-stone-200" />
+          <Globe className="w-5 h-5 text-brand-primary" />
         </div>
         
-        <div className="space-y-6">
-          <div className="space-y-3">
-            <label className="text-[10px] font-black uppercase tracking-widest text-stone-400 ml-2">Native Language (Self-Known)</label>
+        <div className="space-y-8">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 ml-2">
+              <GraduationCap className="w-4 h-4 text-brand-primary" />
+              <label className="text-[10px] font-black uppercase tracking-widest text-stone-400">Fluency Maturity</label>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {PROFICIENCY_LEVELS.map((level) => (
+                <button
+                  key={level.id}
+                  onClick={() => handleUpdateProficiency(level.id)}
+                  className={`p-5 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${
+                    profile?.proficiency === level.id 
+                      ? 'border-brand-primary bg-brand-primary/5 text-brand-primary shadow-lg shadow-brand-primary/5' 
+                      : 'border-stone-50 bg-stone-50 text-stone-400 hover:border-stone-200'
+                  }`}
+                >
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em]">{level.label}</span>
+                  <div className="flex gap-1">
+                    {[...Array(4)].map((_, i) => (
+                      <div 
+                        key={i} 
+                        className={`w-1.5 h-1.5 rounded-full ${i < level.level ? (profile?.proficiency === level.id ? 'bg-brand-primary' : 'bg-stone-300') : 'bg-stone-100'}`} 
+                      />
+                    ))}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <label className="text-[10px] font-black uppercase tracking-widest text-stone-400 ml-2">Luo Dialect / Target Language</label>
             <div className="flex flex-wrap gap-2">
-              {languages.map((lang) => (
+              {LANGUAGES.map((lang) => (
                 <button
                   key={lang}
-                  onClick={() => handleUpdateLanguage('native', lang)}
-                  className={`px-4 py-2 rounded-xl border-2 transition-all text-[10px] font-black uppercase tracking-widest ${
-                    profile?.nativeLanguage === lang 
-                      ? 'border-brand-primary bg-brand-primary/5 text-brand-primary' 
+                  onClick={() => handleUpdateLanguage('target', lang)}
+                  className={`px-6 py-3 rounded-2xl border-2 transition-all text-[10px] font-black uppercase tracking-widest active:scale-95 ${
+                    profile?.targetLanguage === lang 
+                      ? 'border-brand-primary bg-brand-primary text-white shadow-xl shadow-brand-primary/20' 
                       : 'border-stone-50 bg-stone-50 text-stone-400 hover:border-stone-200'
                   }`}
                 >
@@ -235,16 +351,16 @@ export default function UserProfile({ onNavigate }: { onNavigate?: (tab: string)
             </div>
           </div>
 
-          <div className="space-y-3">
-            <label className="text-[10px] font-black uppercase tracking-widest text-brand-primary ml-2 italic">Language to Learn / Enrich</label>
+          <div className="space-y-4">
+            <label className="text-[10px] font-black uppercase tracking-widest text-stone-400 ml-2">Native Gateway</label>
             <div className="flex flex-wrap gap-2">
-              {languages.map((lang) => (
+              {LANGUAGES.map((lang) => (
                 <button
                   key={lang}
-                  onClick={() => handleUpdateLanguage('target', lang)}
-                  className={`px-4 py-2 rounded-xl border-2 transition-all text-[10px] font-black uppercase tracking-widest ${
-                    profile?.targetLanguage === lang 
-                      ? 'border-brand-primary bg-brand-primary text-white shadow-lg shadow-brand-primary/20' 
+                  onClick={() => handleUpdateLanguage('native', lang)}
+                  className={`px-6 py-3 rounded-2xl border-2 transition-all text-[10px] font-black uppercase tracking-widest active:scale-95 ${
+                    profile?.nativeLanguage === lang 
+                      ? 'border-brand-primary bg-brand-primary/5 text-brand-primary border-brand-primary' 
                       : 'border-stone-50 bg-stone-50 text-stone-400 hover:border-stone-200'
                   }`}
                 >
@@ -252,10 +368,6 @@ export default function UserProfile({ onNavigate }: { onNavigate?: (tab: string)
                 </button>
               ))}
             </div>
-            <p className="text-[8px] font-medium text-stone-400 leading-tight ml-2">
-              Select a language to start learning from scratch or to enrich your current fluency. 
-              The Archive will customize its speech output and cultural guidance to your choice.
-            </p>
           </div>
         </div>
       </section>
@@ -421,11 +533,11 @@ export default function UserProfile({ onNavigate }: { onNavigate?: (tab: string)
       </section>
 
       {/* Footer Branding */}
-      <div className="mt-20 flex flex-col items-center gap-4 opacity-20 group grayscale hover:grayscale-0 transition-all cursor-default">
+      <div className="mt-20 flex flex-col items-center gap-4 opacity-20 group grayscale hover:grayscale-0 transition-all cursor-default pb-12">
         <Logo size={48} />
         <div className="text-center">
-          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-stone-600">Lyec Digital Heritage System</p>
-          <p className="text-[8px] font-black uppercase tracking-[0.4em] text-stone-400 mt-1">Certified Acholi Archive v{APP_VERSION}</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-stone-600">Wang Pa Heritage Archive</p>
+          <p className="text-[8px] font-black uppercase tracking-[0.4em] text-stone-400 mt-1">Linguistic Integrity Monitor v{APP_VERSION}</p>
         </div>
       </div>
 

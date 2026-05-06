@@ -1,8 +1,13 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // 0. Default Deny Security Pillar - MUST BE FIRST
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
     // -------------------------------------------------------------------------
-    // GLOBALS & HELPERS
+    // HELPERS & PRIMITIVES
     // -------------------------------------------------------------------------
     
     function isSignedIn() {
@@ -10,11 +15,7 @@ service cloud.firestore {
     }
 
     function isEmailVerified() {
-      return request.auth != null && request.auth.token.email_verified == true;
-    }
-
-    function getAdminData() {
-      return get(/databases/$(database)/documents/admins/$(request.auth.uid)).data;
+      return isSignedIn() && request.auth.token.email_verified == true;
     }
 
     function isAdmin() {
@@ -25,9 +26,11 @@ service cloud.firestore {
     }
 
     function isOwner() {
+      // Identity Roles (Founder/Owner)
       return isAdmin() && (
-        (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'owner') ||
-        request.auth.token.email == "donmckenz20@gmail.com"
+        request.auth.token.email == "donmckenz20@gmail.com" ||
+        (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'owner')
       );
     }
 
@@ -44,12 +47,46 @@ service cloud.firestore {
     }
 
     // -------------------------------------------------------------------------
-    // ADMINS COLLECTION
+    // 1. SHOWCASE / HERITAGE POSTS
+    // -------------------------------------------------------------------------
+    function isValidShowcase(data) {
+      return data.title is string && data.title.size() <= 256 &&
+             data.description is string && data.description.size() <= 5000 &&
+             data.category in ['food', 'wares', 'activities', 'history', 'stories', 'dances'] &&
+             data.image is string && data.image.size() <= 2048;
+    }
+
+    match /showcase/{itemId} {
+      allow read: if true; // Publicly accessible archival feed
+      
+      allow create: if isAdmin() && isValidId(itemId) && 
+        isValidShowcase(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+        
+      allow update: if isAdmin() && 
+        isValidShowcase(incoming()) &&
+        incoming().updatedAt == request.time &&
+        incoming().id == existing().id &&
+        incoming().createdAt == existing().createdAt;
+        
+      allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // TEST CONNECTION
+    // -------------------------------------------------------------------------
+    match /test/connection {
+      allow read: if true;
+    }
+
+    // -------------------------------------------------------------------------
+    // 2. ADMINS COLLECTION
     // -------------------------------------------------------------------------
     match /admins/{adminId} {
       allow read: if isAdmin();
       
-      allow create: if (isOwner() || (isSignedIn() && !exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && request.auth.token.email == "donmckenz20@gmail.com")) && 
+      allow create: if (isOwner() || (isSignedIn() && request.auth.token.email == "donmckenz20@gmail.com")) && 
         isValidId(adminId) &&
         incoming().uid == adminId &&
         incoming().role in ['owner', 'admin'] &&
@@ -59,56 +96,49 @@ service cloud.firestore {
       allow update: if isOwner() && 
         incoming().uid == adminId &&
         incoming().role in ['owner', 'admin'] &&
-        incoming().email == existing().email; // Email is immutable
+        incoming().email == existing().email;
         
       allow delete: if isOwner() && adminId != request.auth.uid;
     }
 
     // -------------------------------------------------------------------------
-    // SHOWCASE / HERITAGE POSTS
-    // -------------------------------------------------------------------------
-    match /showcase/{itemId} {
-      allow get, list: if true;
-      allow write: if isAdmin() && isValidId(itemId);
-    }
-
-    // -------------------------------------------------------------------------
-    // ANNOUNCEMENTS / DISPATCHES
+    // 3. ANNOUNCEMENTS / DISPATCHES
     // -------------------------------------------------------------------------
     match /announcements/{annId} {
-      allow get, list: if true;
+      allow read: if true;
       allow write: if isAdmin() && isValidId(annId);
     }
 
     // -------------------------------------------------------------------------
-    // USER PROFILES
+    // 4. USER PROFILES
     // -------------------------------------------------------------------------
     match /profiles/{userId} {
-      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
       allow create: if isSignedIn() && request.auth.uid == userId &&
+        isValidId(userId) &&
         incoming().uid == userId &&
         incoming().xp == 0 &&
-        incoming().level == 1; // Prevent self-leveling on create
+        incoming().level == 1;
       
-      allow update: if isSignedIn() && request.auth.uid == userId &&
+      allow update: if isAdmin() || (isSignedIn() && request.auth.uid == userId &&
         incoming().uid == userId &&
-        incoming().diff(existing()).affectedKeys().hasOnly(['xp', 'level', 'displayName', 'photoURL', 'persona', 'ageMode', 'faceVerified', 'achievements']);
+        incoming().diff(existing()).affectedKeys().hasOnly(['xp', 'level', 'displayName', 'photoURL', 'persona', 'ageMode', 'faceVerified', 'achievements', 'learningLog', 'targetLanguage']));
     }
 
     // -------------------------------------------------------------------------
-    // SCANS (HERITAGE RADAR)
+    // 5. SCANS (HERITAGE RADAR)
     // -------------------------------------------------------------------------
     match /scans/{scanId} {
       allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
       allow create: if isSignedIn() && 
         incoming().uid == request.auth.uid &&
         incoming().analysis is string &&
-        incoming().analysis.size() < 10000; // Size limit
+        incoming().analysis.size() < 10000;
       allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
     }
 
     // -------------------------------------------------------------------------
-    // EXTENSIONS & INTEGRATIONS
+    // 6. EXTENSIONS & INTEGRATIONS (SYSTEM LEVEL)
     // -------------------------------------------------------------------------
     match /extensions/{extId} {
        allow read: if isAdmin();
@@ -119,10 +149,6 @@ service cloud.firestore {
        allow read: if isAdmin();
        allow write: if isAdmin() && isValidId(intId);
     }
-
-    // Default Deny - Keep at bottom
-    match /{document=**} {
-      allow read, write: if false;
-    }
   }
 }
+

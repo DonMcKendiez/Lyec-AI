@@ -1,6 +1,6 @@
 {
-  "name": "Lyec AI",
-  "description": "Interactive Acholi language learning, translation, and cultural guide.",
+  "name": "Lyec AI · Legacy Vault",
+  "description": "The definitive African heritage vault for Acholi culture and language learning.",
   "requestFramePermissions": ["microphone", "camera"],
   "majorCapabilities": []
 }

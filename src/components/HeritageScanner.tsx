@@ -527,43 +527,42 @@ export default function HeritageScanner() {
   const personas: UserPersona[] = ['professional', 'friendly', 'bestie', 'colleague'];
 
   return (
-    <div className="w-full max-w-5xl mx-auto p-4 space-y-12">
-      <div className="text-center space-y-3 mb-10">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-brand-primary/10 rounded-full text-[10px] font-black uppercase tracking-[0.4em] text-brand-primary">
-          <Eye className="w-3.5 h-3.5" />
+    <div className="w-full max-w-4xl mx-auto p-2 md:p-4 space-y-8 pb-20">
+      <div className="text-center space-y-2 mb-6">
+        <div className="inline-flex items-center gap-2 px-3 py-1 bg-brand-primary/10 rounded-full text-[9px] font-black uppercase tracking-[0.3em] text-brand-primary">
+          <Eye className="w-3 h-3" />
           Neural Recognition
         </div>
-        <h2 className="text-5xl font-display italic font-black text-brand-text tracking-tighter">Wang Pa Archivist</h2>
-        <p className="text-stone-400 font-medium max-w-lg mx-auto">Analyze artifacts through the lens of {profile?.targetLanguage || 'Acholi'} heritage intelligence.</p>
+        <h2 className="text-3xl md:text-5xl font-display italic font-black text-brand-text tracking-tighter">Wang Pa Scanner</h2>
+        <p className="text-stone-400 font-medium max-w-md mx-auto text-[13px]">Analyze heritage artifacts through the lens of Acholi intelligence.</p>
         
         {/* User Stats/Class */}
         {profile && (
-          <div className="flex items-center justify-center gap-6 mt-6">
-          <button 
-            onClick={() => setShowHistory(!showHistory)}
-            className="px-6 py-2 bg-stone-100 hover:bg-stone-200 rounded-2xl flex items-center gap-3 transition-all"
-          >
-            <History className="w-4 h-4 text-stone-500" />
-            <div className="text-left">
-              <p className="text-[8px] font-black uppercase tracking-widest text-stone-400">Archives</p>
-              <p className="text-xs font-bold text-brand-text">View History</p>
-            </div>
-          </button>
-          <div className="px-4 py-2 bg-stone-50 border border-stone-100 rounded-2xl flex items-center gap-3">
-
-              <div className="w-8 h-8 bg-brand-primary rounded-lg flex items-center justify-center text-white text-xs font-black">
+          <div className="flex flex-wrap items-center justify-center gap-3 mt-4">
+            <button 
+              onClick={() => setShowHistory(!showHistory)}
+              className="px-4 py-2 bg-stone-100 hover:bg-stone-200 rounded-xl flex items-center gap-2 transition-all"
+            >
+              <History className="w-3.5 h-3.5 text-stone-500" />
+              <div className="text-left">
+                <p className="text-[7px] font-black uppercase tracking-widest text-stone-400">Archives</p>
+                <p className="text-[11px] font-bold text-brand-text leading-none">History</p>
+              </div>
+            </button>
+            <div className="px-3 py-2 bg-stone-50 border border-stone-100 rounded-xl flex items-center gap-2">
+              <div className="w-6 h-6 bg-brand-primary rounded-lg flex items-center justify-center text-white text-[10px] font-black">
                 {profile.level}
               </div>
               <div className="text-left">
-                <p className="text-[8px] font-black uppercase tracking-widest text-stone-400">Current Rank</p>
-                <p className="text-xs font-bold text-brand-text">Level {profile.level} Apprentice</p>
+                <p className="text-[7px] font-black uppercase tracking-widest text-stone-400">Current Rank</p>
+                <p className="text-[11px] font-bold text-brand-text leading-none">Lvl {profile.level}</p>
               </div>
             </div>
-            <div className="px-4 py-2 bg-stone-50 border border-stone-100 rounded-2xl flex items-center gap-3">
-               <Shield className={`w-5 h-5 ${profile.faceVerified ? 'text-green-500' : 'text-stone-300'}`} />
+            <div className="px-3 py-2 bg-stone-50 border border-stone-100 rounded-xl flex items-center gap-2">
+               <Shield className={`w-4 h-4 ${profile.faceVerified ? 'text-green-500' : 'text-stone-300'}`} />
                <div className="text-left">
-                 <p className="text-[8px] font-black uppercase tracking-widest text-stone-400">Identity Mode</p>
-                 <p className="text-xs font-bold text-brand-text uppercase">{profile.ageMode === 'children' ? 'Protect Mode' : 'Standard'}</p>
+                 <p className="text-[7px] font-black uppercase tracking-widest text-stone-400">Identity Mode</p>
+                 <p className="text-[11px] font-bold text-brand-text uppercase leading-none">{profile.ageMode === 'children' ? 'Protect' : 'Standard'}</p>
                </div>
             </div>
             <AnimatePresence>
@@ -585,18 +584,18 @@ export default function HeritageScanner() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Track: Scanner & Upload */}
-        <div className="lg:col-span-5 space-y-6">
-          <div className="interactive-card p-6 bg-white border border-brand-border shadow-xl overflow-hidden">
-            <header className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-brand-primary text-white rounded-xl">
-                  <Camera className="w-5 h-5" />
+        <div className="lg:col-span-5 space-y-4">
+          <div className="interactive-card p-4 md:p-6 bg-white border border-brand-border shadow-md overflow-hidden rounded-[2rem]">
+            <header className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-brand-primary text-white rounded-lg">
+                  <Camera className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-xs font-black uppercase tracking-widest text-brand-text">Observation Deck</h3>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                    <span className="text-[8px] font-black uppercase tracking-widest text-stone-400">Steady Sensor Active</span>
+                  <h3 className="text-[10px] font-black uppercase tracking-widest text-brand-text">Heritage Lens</h3>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <div className="w-1 h-1 rounded-full bg-green-500 animate-pulse" />
+                    <span className="text-[7px] font-black uppercase tracking-widest text-stone-400">Active</span>
                   </div>
                 </div>
               </div>
@@ -630,21 +629,21 @@ export default function HeritageScanner() {
               className="relative aspect-square md:aspect-[4/3] lg:aspect-square bg-stone-50 rounded-[2rem] overflow-hidden border-2 border-dashed border-stone-200 flex items-center justify-center group/canvas"
             >
               {!image && !showCamera && (
-                <div className="flex flex-col items-center gap-5 p-6 w-full h-full justify-center">
-                  <div className="grid grid-cols-2 gap-4 w-full h-full">
+                <div className="flex flex-col items-center gap-4 p-4 w-full h-full justify-center">
+                  <div className="grid grid-cols-2 gap-3 w-full h-full max-h-[300px]">
                     <button 
                       onClick={startCamera}
-                      className="group flex flex-col items-center justify-center gap-4 bg-white rounded-3xl border-2 border-stone-100 hover:border-brand-primary hover:shadow-lg transition-all"
+                      className="group flex flex-col items-center justify-center gap-3 bg-white rounded-2xl border-2 border-stone-50 hover:border-brand-primary hover:shadow-md transition-all active:scale-95"
                     >
                       <Camera className="w-8 h-8 text-stone-200 group-hover:text-brand-primary transition-colors" />
-                      <span className="text-[9px] font-black uppercase tracking-widest text-stone-400 group-hover:text-brand-primary">Initiate Lens</span>
+                      <span className="text-[8px] font-black uppercase tracking-widest text-stone-400 group-hover:text-brand-primary">Live Scan</span>
                     </button>
                     <button 
                       onClick={() => fileInputRef.current?.click()}
-                      className="group flex flex-col items-center justify-center gap-4 bg-white rounded-3xl border-2 border-stone-100 hover:border-brand-primary hover:shadow-lg transition-all"
+                      className="group flex flex-col items-center justify-center gap-3 bg-white rounded-2xl border-2 border-stone-50 hover:border-brand-primary hover:shadow-md transition-all active:scale-95"
                     >
-                      <Upload className="w-8 h-8 text-stone-200 group-hover:text-brand-primary transition-colors" />
-                      <span className="text-[9px] font-black uppercase tracking-widest text-stone-400 group-hover:text-brand-primary">Upload Archive</span>
+                      <Sparkles className="w-8 h-8 text-stone-200 group-hover:text-brand-primary transition-colors" />
+                      <span className="text-[8px] font-black uppercase tracking-widest text-stone-400 group-hover:text-brand-primary">Visual Search</span>
                     </button>
                   </div>
                 </div>

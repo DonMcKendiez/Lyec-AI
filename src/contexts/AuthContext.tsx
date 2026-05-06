@@ -8,13 +8,18 @@ import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 
 export type UserPersona = 'professional' | 'friendly' | 'bestie' | 'colleague';
 export type AgeMode = 'adult' | 'children';
+export type ProficiencyLevel = 'beginner' | 'intermediate' | 'advanced' | 'fluent';
 
 export interface UserProfile {
   uid: string;
+  displayName?: string;
+  photoURL?: string;
   level: number;
   xp: number;
   ageMode: AgeMode;
   persona: UserPersona;
+  selectedAvatarId?: string;
+  proficiency?: ProficiencyLevel;
   faceVerified: boolean;
   learningLog: string[];
   learningTime?: string;
@@ -66,10 +71,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Create profile if it doesn't exist
             const newProfile: UserProfile = {
               uid: authenticatedUser.uid,
+              displayName: authenticatedUser.displayName || undefined,
+              photoURL: authenticatedUser.photoURL || undefined,
               level: 1,
               xp: 0,
               ageMode: 'adult',
               persona: 'friendly',
+              selectedAvatarId: 'acholi-m-adult',
+              proficiency: 'beginner',
               faceVerified: false,
               learningLog: [],
               learningTime: '09:00',
