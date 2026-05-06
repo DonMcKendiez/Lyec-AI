@@ -32,6 +32,7 @@ export default function LiveAssistant({ isOpen, onClose, onNavigate }: LiveAssis
   const [callDuration, setCallDuration] = useState(0);
   const [signalStrength, setSignalStrength] = useState(3);
   const [showLayout, setShowLayout] = useState<'focused' | 'grid'>('focused');
+  const [useNanoBanana, setUseNanoBanana] = useState(!!((import.meta as any).env.VITE_NANO_BANANA_API_KEY));
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -285,6 +286,7 @@ export default function LiveAssistant({ isOpen, onClose, onNavigate }: LiveAssis
                       src={selectedAvatar.image} 
                       alt={selectedAvatar.name}
                       className={`w-full h-full object-cover transition-all duration-1000 ${isActive ? 'scale-110 brightness-75 blur-[2px]' : 'scale-100'}`}
+                      loading="lazy"
                   />
                   
                   {/* Neural Focus - Circular Avatar when Active */}
@@ -340,7 +342,9 @@ export default function LiveAssistant({ isOpen, onClose, onNavigate }: LiveAssis
                                   />
                                 ))}
                              </div>
-                             <span className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-primary">Neural Link Active</span>
+                             <span className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-primary">
+                                {useNanoBanana ? 'High-Fidelity Nano Banana Link' : 'Neural Link Active'}
+                             </span>
                           </div>
                        </div>
                     </div>
@@ -359,7 +363,7 @@ export default function LiveAssistant({ isOpen, onClose, onNavigate }: LiveAssis
                         onClick={startCall}
                         className="px-8 py-3 bg-brand-primary text-brand-text rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl hover:scale-105 active:scale-95 transition-all"
                        >
-                         Initialize Link
+                         Engage Elephant Protocol
                        </button>
                     </div>
                   )}
@@ -442,7 +446,7 @@ export default function LiveAssistant({ isOpen, onClose, onNavigate }: LiveAssis
                <div className="flex items-center justify-between bg-brand-primary text-brand-text p-4 rounded-3xl shadow-2xl">
                   <div className="flex items-center gap-3">
                      <div className="w-10 h-10 rounded-xl overflow-hidden shadow-md">
-                        <img src={selectedAvatar.image} className="w-full h-full object-cover" alt="" />
+                        <img src={selectedAvatar.image} className="w-full h-full object-cover" alt="" loading="lazy" />
                      </div>
                      <div>
                         <h4 className="text-[10px] font-black uppercase tracking-widest leading-none">{selectedAvatar.name}</h4>
@@ -487,7 +491,7 @@ export default function LiveAssistant({ isOpen, onClose, onNavigate }: LiveAssis
                           onClick={() => setSelectedAvatarId(avatar.id)}
                           className={`group relative aspect-[3/4] rounded-2xl overflow-hidden border-2 transition-all ${selectedAvatarId === avatar.id ? 'border-brand-primary' : 'border-transparent opacity-60'}`}
                         >
-                          <img src={avatar.image} className="w-full h-full object-cover" alt="" />
+                          <img src={avatar.image} className="w-full h-full object-cover" alt="" loading="lazy" />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-3">
                              <span className="text-[9px] font-black uppercase tracking-widest text-white">{avatar.name}</span>
                           </div>
@@ -511,7 +515,7 @@ export default function LiveAssistant({ isOpen, onClose, onNavigate }: LiveAssis
                     onClick={startCall}
                     className="w-full py-4 bg-brand-primary text-brand-text rounded-2xl font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl active:scale-95 transition-all"
                   >
-                    Engage Neural Link
+                    Initiate Elephant Link
                   </button>
                   <button 
                     onClick={onClose}

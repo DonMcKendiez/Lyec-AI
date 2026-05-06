@@ -509,7 +509,12 @@ export default function AdminPanel() {
                       {allUsers.map((u) => (
                         <tr key={u.uid} className="hover:bg-stone-50/50 group transition-colors">
                           <td className="px-6 py-4 flex items-center gap-3">
-                            <img src={u.photoURL || `https://ui-avatars.com/api/?name=${u.displayName}`} className="w-8 h-8 rounded-full bg-stone-100 border border-stone-100" alt="" />
+                            <img 
+                              src={u.photoURL || `https://ui-avatars.com/api/?name=${u.displayName}`} 
+                              className="w-8 h-8 rounded-full bg-stone-100 border border-stone-100" 
+                              alt="" 
+                              loading="lazy"
+                            />
                             <div>
                                <p className="text-sm font-bold text-[#2271b1]">{u.displayName || 'Unknown Curator'}</p>
                                <div className="flex gap-2 text-[9px] mt-0.5 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity font-bold">

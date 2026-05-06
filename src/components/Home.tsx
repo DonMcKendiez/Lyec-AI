@@ -212,6 +212,7 @@ export default function Home({ onNavigate }: { onNavigate?: (tab: any) => void }
                     selectedItem.category !== 'food' ? 'grayscale contrast-[1.2] brightness-[1.1] opacity-70 sepia-[0.1]' : ''
                   }`}
                   referrerPolicy="no-referrer"
+                  loading="lazy"
                 />
                 {selectedItem.category !== 'food' && (
                   <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/natural-paper.png')] opacity-30 pointer-events-none mix-blend-multiply" />
@@ -271,6 +272,7 @@ function ShowcaseCard({ item, onClick }: { item: ShowcaseItem; onClick: () => vo
             isSketch ? 'grayscale contrast-[1.2] brightness-[1.1] opacity-70 sepia-[0.1]' : ''
           }`}
           referrerPolicy="no-referrer"
+          loading="lazy"
         />
         {isSketch && (
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/natural-paper.png')] opacity-30 pointer-events-none mix-blend-multiply" />

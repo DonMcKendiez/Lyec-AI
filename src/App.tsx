@@ -181,24 +181,24 @@ function AppContent() {
           stiffness: 220,
           opacity: { duration: 0.2 }
         }}
-        className="fixed top-0 inset-x-4 md:inset-x-6 z-40 bg-white/95 backdrop-blur-2xl border border-stone-100 px-4 md:px-6 h-14 md:h-16 flex items-center justify-between shadow-lg rounded-[2.5rem]"
+        className="fixed top-0 inset-x-4 md:inset-x-6 z-40 bg-white/95 backdrop-blur-2xl border border-stone-100 px-6 h-18 md:h-22 flex items-center justify-between shadow-2xl rounded-[2.5rem]"
         onClick={() => setShowBars(false)}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <button 
             onClick={(e) => {
               e.stopPropagation();
               setActiveTab('home');
               setShowBars(false);
             }} 
-            className="flex items-center gap-2.5 active:scale-95 transition-all"
+            className="flex items-center gap-3.5 active:scale-95 transition-all group"
           >
-            <div className="p-1.5 bg-brand-primary/5 rounded-lg border border-brand-primary/10">
-              <Logo size={22} />
+            <div className="p-2.5 bg-brand-primary/10 rounded-2xl border border-brand-primary/20 shadow-inner group-hover:rotate-12 transition-transform">
+              <Logo size={28} />
             </div>
-            <div className="flex flex-col -space-y-0.5 text-left">
-              <span className="text-xs font-black text-brand-text uppercase italic tracking-tighter leading-none">Wang<span className="text-brand-primary">Pa</span></span>
-              <span className="text-[6px] font-black uppercase tracking-[0.2em] text-stone-300">The Heritage Spot</span>
+            <div className="flex flex-col -space-y-1 text-left">
+              <span className="text-xl font-black text-brand-text uppercase italic tracking-tighter leading-none">Wang<span className="text-brand-primary underline decoration-4 underline-offset-4">Pa</span></span>
+              <span className="text-[8px] font-black uppercase tracking-[0.4em] text-brand-primary/60">Legacy Protocol</span>
             </div>
           </button>
         </div>
@@ -215,7 +215,7 @@ function AppContent() {
             >
               <div className="w-7 h-7 rounded-full bg-white border border-stone-100 flex items-center justify-center overflow-hidden transition-all group-hover:shadow-sm">
                 {user.photoURL ? (
-                  <img src={user.photoURL} alt="" className="w-full h-full object-cover" />
+                  <img src={user.photoURL} alt="" className="w-full h-full object-cover" loading="lazy" />
                 ) : (
                   <User size={14} className="text-stone-300" />
                 )}

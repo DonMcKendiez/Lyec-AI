@@ -179,7 +179,7 @@ export default function SecureAuth({ onComplete }: { onComplete: () => void }) {
                   <div className="relative flex justify-center text-[10px] uppercase font-black tracking-[0.3em] text-stone-300 bg-white px-2">Luo Trust Network</div>
                 </div>
                 <AuthButton 
-                  icon={<img src="https://www.google.com/favicon.ico" className="w-5 h-5 grayscale opacity-50" alt="" />} 
+                  icon={<img src="https://www.google.com/favicon.ico" className="w-5 h-5 grayscale opacity-50" alt="" loading="lazy" />} 
                   label="Google SSO" 
                   onClick={handleGoogleAuth}
                   primary

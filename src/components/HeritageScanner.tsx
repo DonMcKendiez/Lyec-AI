@@ -771,7 +771,7 @@ export default function HeritageScanner() {
                       transformOrigin: 'center'
                     }}
                   >
-                    <img src={image} className="w-full h-full object-contain" alt="Captured" />
+                    <img src={image} className="w-full h-full object-contain" alt="Captured" loading="lazy" />
                   </div>
 
                   {/* Zoom Controls */}
@@ -1233,7 +1233,7 @@ export default function HeritageScanner() {
                           className="group relative bg-stone-50 rounded-3xl overflow-hidden border border-stone-100 hover:border-brand-primary transition-all p-3 flex items-center gap-4"
                         >
                           <div className="w-20 h-20 rounded-2xl overflow-hidden bg-white border border-stone-100 flex-shrink-0">
-                            <img src={item.thumbnail} className="w-full h-full object-cover" alt={displayName} />
+                            <img src={item.thumbnail} className="w-full h-full object-cover" alt={displayName} loading="lazy" />
                             {isItemEncrypted && !vaultUnlocked && (
                               <div className="absolute inset-0 bg-brand-primary/20 backdrop-blur-[2px] flex items-center justify-center">
                                 <Shield className="w-4 h-4 text-white" />

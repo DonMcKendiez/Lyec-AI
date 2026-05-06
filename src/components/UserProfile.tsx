@@ -125,7 +125,7 @@ export default function UserProfile({ onNavigate }: { onNavigate?: (tab: string)
         <div className="relative group">
           <div className="w-32 h-32 md:w-44 md:h-44 rounded-[2.5rem] bg-stone-50 border-8 border-white shadow-2xl overflow-hidden relative">
             {profileImage ? (
-              <img src={profileImage} alt="Profile" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+              <img src={profileImage} alt="Profile" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" loading="lazy" />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-stone-100">
                 <User className="w-20 h-20 text-stone-200" />
@@ -253,7 +253,7 @@ export default function UserProfile({ onNavigate }: { onNavigate?: (tab: string)
                   : 'border-transparent opacity-40 hover:opacity-100'
                }`}
              >
-               <img src={avatar.image} className="w-full h-full object-cover" alt="" />
+               <img src={avatar.image} className="w-full h-full object-cover" alt="" loading="lazy" />
                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-4">
                   <span className="text-[8px] font-black uppercase tracking-tight text-white">{avatar.name}</span>
                </div>

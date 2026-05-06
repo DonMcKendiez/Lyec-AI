@@ -8,39 +8,33 @@ interface LogoProps {
 
 export default function Logo({ className = '', size = 48, invert = false }: LogoProps) {
   return (
-    <div className={`relative flex items-center justify-center ${className}`} style={{ width: size, height: size }}>
-      <svg
-        viewBox="0 0 100 100"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        className="w-full h-full drop-shadow-2xl"
+    <div 
+      className={`relative flex items-center justify-center ${className}`} 
+      style={{ width: size, height: size }}
+    >
+      <div className={`absolute inset-0 bg-brand-primary/10 blur-xl rounded-full ${invert ? 'hidden' : ''}`} />
+      <svg 
+        viewBox="0 0 24 24" 
+        width={size} 
+        height={size} 
+        className={`relative z-10 transition-transform duration-500 hover:scale-110 ${invert ? 'text-white' : 'text-brand-primary'}`}
+        fill="none" 
+        stroke="currentColor" 
+        strokeWidth="1.5" 
+        strokeLinecap="round" 
+        strokeLinejoin="round"
       >
-        {/* Minimalist Ancestral Icon - Geometric Shield/Mask */}
-        <path
-          d="M50 10L85 30V70L50 90L15 70V30L50 10Z"
-          stroke="currentColor"
-          strokeWidth="4"
-          className={invert ? "text-white" : "text-brand-primary"}
-        />
-        <path
-          d="M50 25C60 25 65 30 65 40V60C65 70 60 75 50 75C40 75 35 70 35 60V40C35 30 40 25 50 25Z"
-          fill="currentColor"
-          className={invert ? "text-white/20" : "text-brand-primary/10"}
-        />
-        <path
-          d="M50 35V65M40 50H60"
-          stroke="currentColor"
-          strokeWidth="6"
-          strokeLinecap="round"
-          className={invert ? "text-white" : "text-brand-primary"}
-        />
-        <path
-          d="M15 30L50 50L85 30"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeOpacity="0.2"
-          className={invert ? "text-white" : "text-brand-primary"}
-        />
+        <path d="M19.5 22s.5-3 2.5-3 2.5 3 2.5 3" />
+        <path d="M14.5 22s.5-3 2.5-3 2.5 3 2.5 3" />
+        <path d="M9.5 22s.5-3 2.5-3 2.5 3 2.5 3" />
+        <path d="M4.5 22s.5-3 2.5-3 2.5 3 2.5 3" />
+        <path d="M12 4.5c4.5 0 9.5 4 9.5 6.5s-2.5 5.5-6.5 5.5c-2.5 0-3-1.5-3-2.5" />
+        <path d="M12 4.5c-4.5 0-9.5 4-9.5 6.5s2.5 5.5 6.5 5.5c2.5 0 3-1.5 3-2.5" />
+        <path d="M12 4.5v12.5" />
+        <path d="M7 8l-4.5 4.5" />
+        <path d="M17 8l4.5 4.5" />
+        <circle cx="9" cy="8" r="1" fill="currentColor" />
+        <circle cx="15" cy="8" r="1" fill="currentColor" />
       </svg>
     </div>
   );
