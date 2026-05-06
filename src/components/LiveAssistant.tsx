@@ -49,7 +49,8 @@ export default function LiveAssistant({ isOpen, onClose, onNavigate }: LiveAssis
   const startCall = async () => {
     try {
       setStatus('connecting');
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || (process.env as any).GEMINI_API_KEY;
+      const ai = new GoogleGenAI({ apiKey });
       
       // Request media
       const stream = await navigator.mediaDevices.getUserMedia({ 

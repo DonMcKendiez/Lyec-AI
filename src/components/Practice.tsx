@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { BookOpen, MapPin, CheckCircle2, ChevronRight, Loader2, Trophy, ArrowRight, User, Volume2, XCircle, Mic, Square, Activity, Sparkles } from 'lucide-react';
 import Logo from './Logo';
 import { generateLessonContent, speakLanguage, evaluatePronunciation } from '../lib/gemini';

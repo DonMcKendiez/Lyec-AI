@@ -43,6 +43,7 @@ function AppContent() {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<{ available: boolean; version: string } | null>(null);
   
+  const lastRemindedMinute = useRef("");
   const [showBars, setShowBars] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isScrollingUp, setIsScrollingUp] = useState(false);
@@ -304,46 +305,53 @@ function AppContent() {
         </AnimatePresence>
       </main>
 
-      {/* Apple-esque Mobile Bottom Navigation with Drawer Handle */}
+      {/* Apple-esque Mobile Bottom Navigation with Improved Drawer Handle */}
       <motion.nav 
         drag="y"
         dragConstraints={{ top: 0, bottom: 0 }}
-        dragElastic={0.05}
+        dragElastic={0.08}
         onDragEnd={(_, info) => {
-          if (info.offset.y < -20) setShowBars(true);
-          if (info.offset.y > 20) setShowBars(false);
+          if (info.offset.y < -30) setShowBars(true);
+          if (info.offset.y > 30) setShowBars(false);
         }}
         animate={{ 
-          y: showBars ? 0 : 100,
-          scale: showBars ? 1 : 0.98,
-          opacity: showBars ? 1 : 0.8
+          y: showBars ? 0 : 110,
+          scale: showBars ? 1 : 0.96,
+          opacity: showBars ? 1 : 0.85
         }}
-        transition={{ type: "spring", damping: 30, stiffness: 300 }}
-        className="fixed bottom-0 inset-x-0 z-50 bg-white/95 backdrop-blur-3xl border-t border-stone-100 flex items-end justify-around px-4 pb-safe-bottom h-20 md:h-28 shadow-[0_-8px_30px_rgb(0,0,0,0.06)]"
+        transition={{ 
+          type: "spring", 
+          damping: 32, 
+          stiffness: 280,
+          opacity: { duration: 0.2 }
+        }}
+        className="fixed bottom-0 inset-x-0 z-50 bg-white/95 backdrop-blur-3xl border-t border-stone-100 flex items-end justify-around px-4 pb-safe-bottom h-20 md:h-28 shadow-[0_-12px_44px_rgba(0,0,0,0.06)]"
       >
-        {/* Drawer Handle (Visual Indicator) */}
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-10 h-1.5 bg-stone-100 rounded-full md:hidden cursor-grab active:cursor-grabbing" />
+        {/* Modern Drawer Handle Indicator */}
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-stone-100 rounded-full md:hidden cursor-grab active:cursor-grabbing hover:bg-stone-200 transition-colors" />
         
         <AnimatePresence>
           {!showBars && (
-            <motion.button 
-              initial={{ opacity: 0, y: 10, x: "-50%" }}
-              animate={{ opacity: 1, y: 0, x: "-50%" }}
-              exit={{ opacity: 0, y: 10, x: "-50%" }}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={() => setShowBars(true)}
-              className="absolute -top-14 left-1/2 w-14 h-14 bg-brand-primary text-white rounded-2xl flex items-center justify-center shadow-[0_10px_40px_rgba(242,125,38,0.4)] border-4 border-white active:scale-90 transition-all cursor-pointer z-50"
-            >
-              <LayoutGrid className="w-6 h-6" />
-              <motion.div 
-                animate={{ y: [0, -4, 0] }}
-                transition={{ repeat: Infinity, duration: 1.5 }}
-                className="absolute -top-6 left-1/2 -translate-x-1/2 text-brand-primary font-black text-[8px] uppercase tracking-widest whitespace-nowrap bg-white px-2 py-1 rounded-full shadow-sm"
-              >
-                Reveal Vault
-              </motion.div>
-            </motion.button>
+             <motion.button 
+               initial={{ opacity: 0, y: 20, x: "-50%" }}
+               animate={{ opacity: 1, y: 0, x: "-50%" }}
+               exit={{ opacity: 0, y: 20, x: "-50%" }}
+               whileHover={{ scale: 1.1, y: -2 }}
+               whileTap={{ scale: 0.9 }}
+               onClick={() => setShowBars(true)}
+               className="absolute -top-16 left-1/2 w-14 h-14 bg-brand-primary text-white rounded-3xl flex items-center justify-center shadow-[0_12px_48px_rgba(242,125,38,0.4)] border-[6px] border-white active:scale-90 transition-all cursor-pointer z-50"
+             >
+               <LayoutGrid className="w-6 h-6" />
+               <motion.div 
+                 initial={{ opacity: 0, y: 10 }}
+                 animate={{ opacity: 1, y: -24 }}
+                 transition={{ delay: 0.5 }}
+                 className="absolute left-1/2 -translate-x-1/2 text-[9px] font-black uppercase tracking-[0.2em] text-brand-primary whitespace-nowrap bg-white/90 backdrop-blur-md px-3 py-1 rounded-full shadow-sm border border-brand-primary/10"
+               >
+                 Open Archive
+               </motion.div>
+               <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-4 h-1 bg-white/40 rounded-full animate-bounce" />
+             </motion.button>
           )}
         </AnimatePresence>
         {mainTabs.map((tab) => (

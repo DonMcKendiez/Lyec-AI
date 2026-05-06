@@ -14,7 +14,7 @@ export async function checkForUpdates(): Promise<{ updateAvailable: boolean; lat
   const lastSeen = localStorage.getItem('lyec_last_update_seen');
   
   return {
-    updateAvailable: APP_VERSION !== LATEST_VERSION && lastSeen !== LATEST_VERSION,
+    updateAvailable: (APP_VERSION as string) !== LATEST_VERSION && lastSeen !== LATEST_VERSION,
     latestVersion: LATEST_VERSION
   };
 }

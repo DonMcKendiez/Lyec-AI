@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Utensils, Construction, Tent, ArrowRight, Loader2, X, BookOpen, Coffee, Music, Volume2, Sparkles, Camera } from 'lucide-react';
 import { generateCulturalPost, speakLanguage } from '../lib/gemini';
 import { getShowcaseItems, subscribeShowcaseItems, ShowcaseItem } from '../services/showcaseService';
